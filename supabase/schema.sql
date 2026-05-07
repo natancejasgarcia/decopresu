@@ -76,8 +76,13 @@ create table if not exists public.rooms (
   ceiling_area numeric(10, 2) generated always as (round(length * width, 2)) stored,
   wall_area numeric(10, 2) generated always as (round(2 * (length + width) * height, 2)) stored,
   openings_area numeric(10, 2) not null default 0 check (openings_area >= 0),
+  paint_scope text not null default 'walls_and_ceiling' check (paint_scope in ('walls_and_ceiling', 'ceiling_only')),
+  unit_price numeric(10, 2) not null default 6 check (unit_price >= 0),
   total_paintable_area numeric(10, 2) generated always as (
-    greatest(round((length * width) + (2 * (length + width) * height) - openings_area, 2), 0)
+    case
+      when paint_scope = 'ceiling_only' then round(length * width, 2)
+      else greatest(round((length * width) + (2 * (length + width) * height) - openings_area, 2), 0)
+    end
   ) stored,
   notes text,
   created_at timestamptz not null default now()
@@ -87,6 +92,7 @@ create table if not exists public.budget_items (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.projects(id) on delete cascade,
   concept text not null,
+  notes text,
   quantity numeric(10, 2) not null check (quantity > 0),
   unit text not null,
   unit_price numeric(10, 2) not null default 0 check (unit_price >= 0),

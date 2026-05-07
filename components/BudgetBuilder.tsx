@@ -1,10 +1,10 @@
 "use client";
 
-import { FormEvent, useMemo, useState, useTransition } from "react";
+import { FormEvent, useMemo, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Calculator, Printer, ReceiptText, Trash2 } from "lucide-react";
-import { createBudgetItemAction, deleteBudgetItemAction } from "@/actions/budgetActions";
+import { Calculator, Download, ReceiptText, Trash2 } from "lucide-react";
+import { createBudgetItemAction, createBudgetItemsFromRoomsAction, deleteBudgetItemAction } from "@/actions/budgetActions";
 import { formatCurrency } from "@/lib/calculations";
 import type { BudgetItem, Room } from "@/lib/types";
 
@@ -27,14 +27,16 @@ const CONCEPTS = [
 
 export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
   const router = useRouter();
-  const [pricePerMeter, setPricePerMeter] = useState(6);
   const [isPending, startTransition] = useTransition();
   const total = useMemo(() => items.reduce((sum, item) => sum + Number(item.total), 0), [items]);
   const roomArea = useMemo(
     () => rooms.reduce((sum, room) => sum + Number(room.total_paintable_area), 0),
     [rooms],
   );
-  const roomEstimate = roomArea * pricePerMeter;
+  const roomEstimate = useMemo(
+    () => rooms.reduce((sum, room) => sum + Number(room.total_paintable_area) * Number(room.unit_price ?? 0), 0),
+    [rooms],
+  );
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -49,11 +51,9 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
 
   function handleRoomBudgetSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (roomArea <= 0) return;
-
     const formData = new FormData(event.currentTarget);
     startTransition(async () => {
-      await createBudgetItemAction(formData);
+      await createBudgetItemsFromRoomsAction(formData);
       router.refresh();
     });
   }
@@ -73,51 +73,28 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
     <section className="section-panel">
       <div className="section-heading">
         <h2>Presupuesto</h2>
-        <Link className="inline-flex h-10 items-center gap-2 rounded-lg border border-line px-3 text-sm font-black text-ink" href={`/projects/${projectId}/budget/print`}>
-          <Printer size={17} />
-          Imprimir
+        <Link className="inline-flex h-10 items-center gap-2 rounded-lg border border-line px-3 text-sm font-black text-ink" href={`/projects/${projectId}/budget/pdf`}>
+          <Download size={17} />
+          Descargar PDF
         </Link>
       </div>
 
       <form onSubmit={handleRoomBudgetSubmit} className="mb-4 grid gap-3 rounded-lg border border-line bg-white p-3">
         <input type="hidden" name="project_id" value={projectId} />
-        <input type="hidden" name="concept" value="Pintura según mediciones" />
-        <input type="hidden" name="quantity" value={roomArea.toFixed(2)} />
-        <input type="hidden" name="unit" value="m2" />
-        <input type="hidden" name="unit_price" value={pricePerMeter} />
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-black uppercase text-muted">Presupuesto por metros</p>
-            <h3 className="mt-1 text-xl font-black text-ink">{roomArea.toFixed(2)} m2 medidos</h3>
-            <p className="mt-1 text-sm font-semibold text-muted">
-              {rooms.length} habitaciones · {formatCurrency(pricePerMeter)} / m2
-            </p>
-          </div>
-          <div className="grid gap-1 sm:w-44">
-            <label className="form-label" htmlFor="price-per-meter">Precio por m2</label>
-            <input
-              className="form-input"
-              id="price-per-meter"
-              type="number"
-              min="0"
-              step="0.01"
-              value={pricePerMeter}
-              onChange={(event) => setPricePerMeter(Number(event.target.value) || 0)}
-            />
-          </div>
-        </div>
         <div className="grid gap-3 rounded-lg bg-paper p-3 sm:grid-cols-[1fr_auto] sm:items-center">
           <div>
-            <span className="text-sm font-bold text-muted">Estimación con habitaciones</span>
-            <strong className="mt-1 block text-2xl text-ink">{formatCurrency(roomEstimate)}</strong>
-            <p className="text-sm font-bold text-muted">IVA no incluido</p>
+            <p className="text-xs font-black uppercase text-muted">Presupuesto desde habitaciones</p>
+            <h3 className="mt-1 text-xl font-black text-ink">{formatCurrency(roomEstimate)}</h3>
+            <p className="mt-1 text-sm font-semibold text-muted">
+              {rooms.length} habitaciones · {roomArea.toFixed(2)} m2 · precio propio por habitación
+            </p>
           </div>
           <button
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-moss px-4 font-black text-white disabled:opacity-60"
             disabled={isPending || roomArea <= 0}
           >
             <Calculator size={18} />
-            Añadir por m2
+            Crear líneas
           </button>
         </div>
       </form>
@@ -131,6 +108,10 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
               <option key={concept} value={concept}>{concept}</option>
             ))}
           </select>
+        </div>
+        <div>
+          <label className="form-label" htmlFor="notes">Notas del concepto</label>
+          <textarea className="form-input min-h-20" id="notes" name="notes" placeholder="Detalle del trabajo, acabado, materiales o condiciones..." />
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div>
@@ -161,6 +142,7 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
               <div>
                 <strong className="block text-ink">{item.concept}</strong>
                 <span className="text-sm text-muted">{Number(item.quantity)} {item.unit} x {formatCurrency(Number(item.unit_price))}</span>
+                {item.notes ? <p className="mt-1 text-sm text-muted">{item.notes}</p> : null}
               </div>
               <strong className="text-ink">{formatCurrency(Number(item.total))}</strong>
               <button

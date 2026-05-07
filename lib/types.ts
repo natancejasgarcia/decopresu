@@ -15,6 +15,8 @@ export const PROJECT_STATUSES: ProjectStatus[] = [
   "Cobrado",
 ];
 
+export type RoomPaintScope = "walls_and_ceiling" | "ceiling_only";
+
 export type Profile = {
   id: string;
   user_id: string;
@@ -70,6 +72,8 @@ export type Room = {
   wall_area: number;
   openings_area: number;
   total_paintable_area: number;
+  paint_scope: RoomPaintScope;
+  unit_price: number;
   notes: string | null;
   created_at: string;
 };
@@ -78,6 +82,7 @@ export type BudgetItem = {
   id: string;
   project_id: string;
   concept: string;
+  notes: string | null;
   quantity: number;
   unit: string;
   unit_price: number;
