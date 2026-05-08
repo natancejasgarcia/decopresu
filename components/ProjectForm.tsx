@@ -38,7 +38,7 @@ export function ProjectForm() {
       </div>
       <div>
         <label className="form-label" htmlFor="description">Descripcion del trabajo</label>
-        <textarea className="form-input min-h-28" id="description" name="description" required placeholder="Pintura de paredes, techos, reparaciones..." />
+        <textarea className="form-input min-h-28" id="description" name="description" required minLength={3} placeholder="Pintura de paredes, techos, reparaciones..." />
       </div>
       <div>
         <label className="form-label" htmlFor="internal_notes">Notas internas</label>

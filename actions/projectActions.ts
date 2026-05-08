@@ -19,14 +19,18 @@ const projectSchema = z.object({
 
 export async function createProjectAction(formData: FormData) {
   const { supabase, user } = await requireUserProfile();
-  const parsed = projectSchema.parse(Object.fromEntries(formData));
+  const parsed = projectSchema.safeParse(Object.fromEntries(formData));
+
+  if (!parsed.success) {
+    return;
+  }
 
   const { data, error } = await supabase
     .from("projects")
     .insert({
-      ...parsed,
-      client_email: parsed.client_email || null,
-      internal_notes: parsed.internal_notes || null,
+      ...parsed.data,
+      client_email: parsed.data.client_email || null,
+      internal_notes: parsed.data.internal_notes || null,
       created_by: user.id,
     })
     .select("id")
