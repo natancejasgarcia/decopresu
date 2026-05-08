@@ -61,3 +61,30 @@ export async function updateProjectStatusAction(formData: FormData) {
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/dashboard");
 }
+
+export async function updateProjectAction(formData: FormData) {
+  const { supabase } = await requireUserProfile();
+  const projectId = z.string().uuid().parse(formData.get("project_id"));
+  const parsed = projectSchema.safeParse(Object.fromEntries(formData));
+
+  if (!parsed.success) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("projects")
+    .update({
+      ...parsed.data,
+      client_email: parsed.data.client_email || null,
+      internal_notes: parsed.data.internal_notes || null,
+      last_activity_at: new Date().toISOString(),
+    })
+    .eq("id", projectId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/dashboard");
+}

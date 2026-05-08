@@ -5,6 +5,7 @@ import { BudgetBuilder } from "@/components/BudgetBuilder";
 import { ClientCard } from "@/components/ClientCard";
 import { FileUploader } from "@/components/FileUploader";
 import { ProjectChat } from "@/components/ProjectChat";
+import { ProjectEditForm } from "@/components/ProjectEditForm";
 import { RoomCalculator } from "@/components/RoomCalculator";
 import { formatCurrency } from "@/lib/calculations";
 import type { BudgetItem, Message, Profile, Project, ProjectFile, Room } from "@/lib/types";
@@ -30,6 +31,7 @@ export function ProjectTabs({
   budgetItems,
 }: ProjectTabsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("Resumen");
+  const [isEditingProject, setIsEditingProject] = useState(false);
   const budgetTotal = budgetItems.reduce((sum, item) => sum + Number(item.total), 0);
 
   return (
@@ -54,31 +56,47 @@ export function ProjectTabs({
           <section className="section-panel">
             <div className="section-heading">
               <h2>Resumen</h2>
-              <span className="rounded-full bg-paper px-3 py-1 text-sm font-black text-steel">{project.status}</span>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-lg bg-paper p-4">
-                <p className="text-xs font-black uppercase text-muted">Cliente</p>
-                <h3 className="mt-1 text-xl font-black text-ink">{project.client_name}</h3>
-                <p className="mt-2 text-sm leading-6 text-muted">{project.address}</p>
-                <p className="mt-2 text-sm leading-6 text-muted">{project.client_phone}</p>
-              </div>
-              <div className="rounded-lg bg-paper p-4">
-                <p className="text-xs font-black uppercase text-muted">Presupuesto estimado</p>
-                <h3 className="mt-1 text-2xl font-black text-ink">{formatCurrency(budgetTotal)}</h3>
-                <p className="mt-2 text-sm font-bold text-muted">IVA no incluido</p>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-paper px-3 py-1 text-sm font-black text-steel">{project.status}</span>
+                <button
+                  className="h-10 rounded-lg border border-line px-3 text-sm font-black text-ink"
+                  onClick={() => setIsEditingProject((current) => !current)}
+                  type="button"
+                >
+                  {isEditingProject ? "Cerrar" : "Editar obra"}
+                </button>
               </div>
             </div>
-            <div className="mt-4 rounded-lg bg-white p-4 ring-1 ring-line">
-              <p className="text-xs font-black uppercase text-muted">Descripcion</p>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink">{project.description}</p>
-            </div>
-            {project.internal_notes ? (
-              <div className="mt-4 rounded-lg bg-white p-4 ring-1 ring-line">
-                <p className="text-xs font-black uppercase text-muted">Notas internas</p>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink">{project.internal_notes}</p>
-              </div>
-            ) : null}
+            {isEditingProject ? (
+              <ProjectEditForm project={project} />
+            ) : (
+              <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-lg bg-paper p-4">
+                    <p className="text-xs font-black uppercase text-muted">Cliente</p>
+                    <h3 className="mt-1 text-xl font-black text-ink">{project.client_name}</h3>
+                    <p className="mt-2 text-sm leading-6 text-muted">{project.address}</p>
+                    <p className="mt-2 text-sm leading-6 text-muted">{project.client_phone}</p>
+                    {project.client_email ? <p className="mt-2 text-sm leading-6 text-muted">{project.client_email}</p> : null}
+                  </div>
+                  <div className="rounded-lg bg-paper p-4">
+                    <p className="text-xs font-black uppercase text-muted">Presupuesto estimado</p>
+                    <h3 className="mt-1 text-2xl font-black text-ink">{formatCurrency(budgetTotal)}</h3>
+                    <p className="mt-2 text-sm font-bold text-muted">IVA no incluido</p>
+                  </div>
+                </div>
+                <div className="mt-4 rounded-lg bg-white p-4 ring-1 ring-line">
+                  <p className="text-xs font-black uppercase text-muted">Descripcion</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink">{project.description}</p>
+                </div>
+                {project.internal_notes ? (
+                  <div className="mt-4 rounded-lg bg-white p-4 ring-1 ring-line">
+                    <p className="text-xs font-black uppercase text-muted">Notas internas</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink">{project.internal_notes}</p>
+                  </div>
+                ) : null}
+              </>
+            )}
           </section>
         ) : null}
 
