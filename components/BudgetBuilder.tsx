@@ -116,7 +116,7 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
         <div className="grid grid-cols-3 gap-3">
           <div>
             <label className="form-label" htmlFor="quantity">Cantidad</label>
-            <input className="form-input" id="quantity" name="quantity" type="number" min="0" step="0.01" defaultValue="1" required />
+            <input className="form-input" id="quantity" name="quantity" type="number" min="0.01" step="0.01" defaultValue="1" required />
           </div>
           <div>
             <label className="form-label" htmlFor="unit">Unidad</label>

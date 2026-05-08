@@ -16,11 +16,15 @@ const budgetItemSchema = z.object({
 
 export async function createBudgetItemAction(formData: FormData) {
   const { supabase } = await requireUserProfile();
-  const parsed = budgetItemSchema.parse(Object.fromEntries(formData));
+  const parsed = budgetItemSchema.safeParse(Object.fromEntries(formData));
+
+  if (!parsed.success) {
+    return;
+  }
 
   const { error } = await supabase.from("budget_items").insert({
-    ...parsed,
-    notes: parsed.notes || null,
+    ...parsed.data,
+    notes: parsed.data.notes || null,
   });
 
   if (error) {
@@ -30,9 +34,9 @@ export async function createBudgetItemAction(formData: FormData) {
   await supabase
     .from("projects")
     .update({ status: "Presupuestado", last_activity_at: new Date().toISOString() })
-    .eq("id", parsed.project_id);
+    .eq("id", parsed.data.project_id);
 
-  revalidatePath(`/projects/${parsed.project_id}`);
+  revalidatePath(`/projects/${parsed.data.project_id}`);
   revalidatePath("/dashboard");
 }
 
