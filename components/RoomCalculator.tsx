@@ -17,6 +17,7 @@ type PreviewState = {
   width: number;
   height: number;
   openingsArea: number;
+  manualArea: number;
   paintScope: RoomPaintScope;
 };
 
@@ -29,6 +30,7 @@ export function RoomCalculator({ projectId, rooms }: RoomCalculatorProps) {
     width: 0,
     height: 0,
     openingsArea: 0,
+    manualArea: 0,
     paintScope: "walls_and_ceiling",
   });
   const calculated = calculateRoomAreas(preview);
@@ -48,7 +50,7 @@ export function RoomCalculator({ projectId, rooms }: RoomCalculatorProps) {
     startTransition(async () => {
       await createRoomAction(formData);
       form.reset();
-      setPreview({ length: 0, width: 0, height: 0, openingsArea: 0, paintScope: "walls_and_ceiling" });
+      setPreview({ length: 0, width: 0, height: 0, openingsArea: 0, manualArea: 0, paintScope: "walls_and_ceiling" });
       router.refresh();
     });
   }
@@ -80,16 +82,19 @@ export function RoomCalculator({ projectId, rooms }: RoomCalculatorProps) {
       width: Number(formData.get("width") || 0),
       height: Number(formData.get("height") || 0),
       openingsArea: Number(formData.get("openings_area") || 0),
+      manualArea: Number(formData.get("manual_area") || 0),
       paintScope: String(formData.get("paint_scope") || "walls_and_ceiling") as RoomPaintScope,
     });
   }
+
+  const isManualPreview = preview.paintScope === "manual_area";
 
   return (
     <section className="section-panel">
       <div className="section-heading">
         <div>
           <h2>Plano por habitaciones</h2>
-          <p className="mt-1 text-sm font-semibold text-muted">Cada habitación tiene su propio tipo de trabajo y precio por m2.</p>
+          <p className="mt-1 text-sm font-semibold text-muted">Elige techo + paredes, solo techo o mete los m2 directos.</p>
         </div>
         <span className="rounded-full bg-paper px-3 py-1 text-sm font-black text-moss">
           {projectTotal.toFixed(2)} m2
@@ -106,34 +111,45 @@ export function RoomCalculator({ projectId, rooms }: RoomCalculatorProps) {
 
       <form onSubmit={handleSubmit} onChange={(event) => updatePreview(event.currentTarget)} className="grid gap-3 rounded-lg bg-paper p-3">
         <input type="hidden" name="project_id" value={projectId} />
-        <RoomFields calculatedTotal={calculated.totalPaintableArea} />
+        <RoomFields />
         <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-          <Metric label="Techo" value={calculated.ceilingArea} />
-          <Metric label="Paredes" value={calculated.wallArea} />
-          <Metric label="Descuento" value={preview.paintScope === "ceiling_only" ? 0 : calculated.openingsArea} />
-          <Metric label="Total estancia" value={calculated.totalPaintableArea} />
+          {isManualPreview ? (
+            <>
+              <Metric label="M2 introducidos" value={calculated.manualArea} />
+              <Metric label="Total estancia" value={calculated.totalPaintableArea} />
+            </>
+          ) : (
+            <>
+              <Metric label="Techo" value={calculated.ceilingArea} />
+              <Metric label="Paredes" value={calculated.wallArea} />
+              <Metric label="Descuento" value={preview.paintScope === "ceiling_only" ? 0 : calculated.openingsArea} />
+              <Metric label="Total estancia" value={calculated.totalPaintableArea} />
+            </>
+          )}
         </div>
         <button className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-moss px-4 font-black text-white disabled:opacity-60" disabled={isPending}>
           <Ruler size={18} />
-          Añadir habitación
+          Añadir medición
         </button>
       </form>
 
       <div className="mt-5 grid gap-3">
         {rooms.length === 0 ? (
-          <p className="rounded-lg bg-paper p-4 text-sm text-muted">Añade habitaciones para calcular los metros del proyecto.</p>
+          <p className="rounded-lg bg-paper p-4 text-sm text-muted">Añade habitaciones o zonas para calcular los metros del proyecto.</p>
         ) : (
           rooms.map((room) => {
             const roomTotal = Number(room.total_paintable_area);
             const roomPrice = Number(room.unit_price ?? 0);
             const isCeilingOnly = room.paint_scope === "ceiling_only";
+            const isManualArea = room.paint_scope === "manual_area";
+            const scopeLabel = isManualArea ? "Metro cuadrado" : isCeilingOnly ? "Solo techo" : "Techo + paredes";
 
             if (editingRoomId === room.id) {
               return (
                 <form key={room.id} onSubmit={handleEditSubmit} className="grid gap-3 rounded-lg border border-moss bg-white p-3">
                   <input type="hidden" name="project_id" value={projectId} />
                   <input type="hidden" name="room_id" value={room.id} />
-                  <RoomFields room={room} calculatedTotal={roomTotal} />
+                  <RoomFields room={room} />
                   <div className="flex gap-2">
                     <button className="h-10 flex-1 rounded-lg bg-moss px-4 font-black text-white disabled:opacity-60" disabled={isPending}>
                       Guardar cambios
@@ -152,9 +168,7 @@ export function RoomCalculator({ projectId, rooms }: RoomCalculatorProps) {
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-black text-ink">{room.name}</h3>
-                      <span className="rounded-full bg-paper px-2 py-1 text-xs font-black text-steel">
-                        {isCeilingOnly ? "Solo techo" : "Techo + paredes"}
-                      </span>
+                      <span className="rounded-full bg-paper px-2 py-1 text-xs font-black text-steel">{scopeLabel}</span>
                     </div>
                     {room.notes ? <p className="mt-1 text-sm text-muted">{room.notes}</p> : null}
                   </div>
@@ -164,10 +178,19 @@ export function RoomCalculator({ projectId, rooms }: RoomCalculatorProps) {
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted sm:grid-cols-5">
-                  <span>Techo {Number(room.ceiling_area).toFixed(2)} m2</span>
-                  <span>Paredes {Number(room.wall_area).toFixed(2)} m2</span>
-                  <span>Descuento {isCeilingOnly ? "0.00" : Number(room.openings_area).toFixed(2)} m2</span>
-                  <span>{room.length} x {room.width} x {room.height} m</span>
+                  {isManualArea ? (
+                    <>
+                      <span>M2 directos {Number(room.manual_area ?? roomTotal).toFixed(2)}</span>
+                      <span>Sin medidas de lados</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Techo {Number(room.ceiling_area).toFixed(2)} m2</span>
+                      <span>Paredes {Number(room.wall_area).toFixed(2)} m2</span>
+                      <span>Descuento {isCeilingOnly ? "0.00" : Number(room.openings_area).toFixed(2)} m2</span>
+                      <span>{room.length} x {room.width} x {room.height} m</span>
+                    </>
+                  )}
                   <span>{formatCurrency(roomPrice)} / m2</span>
                 </div>
                 <div className="mt-3 flex justify-end gap-2">
@@ -198,42 +221,74 @@ export function RoomCalculator({ projectId, rooms }: RoomCalculatorProps) {
   );
 }
 
-function RoomFields({ room, calculatedTotal }: { room?: Room; calculatedTotal: number }) {
+function RoomFields({ room }: { room?: Room }) {
   const defaultScope = room?.paint_scope ?? "walls_and_ceiling";
+  const [scope, setScope] = useState<RoomPaintScope>(defaultScope);
+  const idPrefix = room?.id ?? "new";
+  const isManualArea = scope === "manual_area";
 
   return (
     <>
       <div>
-        <label className="form-label" htmlFor={room ? `room-name-${room.id}` : "room-name"}>Habitación o zona</label>
-        <input className="form-input" id={room ? `room-name-${room.id}` : "room-name"} name="name" required defaultValue={room?.name ?? ""} placeholder="Salón, pasillo, dormitorio..." />
+        <label className="form-label" htmlFor={`room-name-${idPrefix}`}>Habitación o zona</label>
+        <input className="form-input" id={`room-name-${idPrefix}`} name="name" required defaultValue={room?.name ?? ""} placeholder="Salón, pasillo, dormitorio, fachada..." />
       </div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-black text-ink">
-          <input type="radio" name="paint_scope" value="walls_and_ceiling" defaultChecked={defaultScope === "walls_and_ceiling"} />
-          Techo + paredes
-        </label>
-        <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-black text-ink">
-          <input type="radio" name="paint_scope" value="ceiling_only" defaultChecked={defaultScope === "ceiling_only"} />
-          Solo techo
-        </label>
+      <div className="grid gap-2 sm:grid-cols-3">
+        <ScopeOption name="paint_scope" value="walls_and_ceiling" checked={scope === "walls_and_ceiling"} onChange={() => setScope("walls_and_ceiling")} label="Techo + paredes" />
+        <ScopeOption name="paint_scope" value="ceiling_only" checked={scope === "ceiling_only"} onChange={() => setScope("ceiling_only")} label="Solo techo" />
+        <ScopeOption name="paint_scope" value="manual_area" checked={scope === "manual_area"} onChange={() => setScope("manual_area")} label="Metro cuadrado" />
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <NumberField name="length" label="Largo" defaultValue={room?.length ?? 0} />
-        <NumberField name="width" label="Ancho" defaultValue={room?.width ?? 0} />
-        <NumberField name="height" label="Alto" defaultValue={room?.height ?? 0} />
-        <NumberField name="openings_area" label="Puertas/ventanas" defaultValue={room?.openings_area ?? 0} />
-        <NumberField name="unit_price" label="Precio m2" defaultValue={room?.unit_price ?? 6} />
-      </div>
+
+      {isManualArea ? (
+        <>
+          <input type="hidden" name="length" value="1" />
+          <input type="hidden" name="width" value="1" />
+          <input type="hidden" name="height" value="1" />
+          <input type="hidden" name="openings_area" value="0" />
+          <div className="grid grid-cols-2 gap-3">
+            <NumberField name="manual_area" label="M2" defaultValue={room?.manual_area ?? room?.total_paintable_area ?? 0} />
+            <NumberField name="unit_price" label="Precio m2" defaultValue={room?.unit_price ?? 6} />
+          </div>
+        </>
+      ) : (
+        <>
+          <input type="hidden" name="manual_area" value="0" />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <NumberField name="length" label="Largo" defaultValue={room?.length ?? 0} />
+            <NumberField name="width" label="Ancho" defaultValue={room?.width ?? 0} />
+            <NumberField name="height" label="Alto" defaultValue={room?.height ?? 0} />
+            <NumberField name="openings_area" label="Puertas/ventanas" defaultValue={room?.openings_area ?? 0} />
+            <NumberField name="unit_price" label="Precio m2" defaultValue={room?.unit_price ?? 6} />
+          </div>
+        </>
+      )}
+
       <div>
-        <label className="form-label" htmlFor={room ? `room-notes-${room.id}` : "room-notes"}>Notas</label>
-        <input className="form-input" id={room ? `room-notes-${room.id}` : "room-notes"} name="notes" defaultValue={room?.notes ?? ""} placeholder="Humedad, remates, color, protección..." />
+        <label className="form-label" htmlFor={`room-notes-${idPrefix}`}>Notas</label>
+        <input className="form-input" id={`room-notes-${idPrefix}`} name="notes" defaultValue={room?.notes ?? ""} placeholder="Humedad, remates, color, protección..." />
       </div>
-      {room ? (
-        <p className="rounded-lg bg-paper p-3 text-sm font-bold text-muted">
-          Total actual de la estancia: {calculatedTotal.toFixed(2)} m2
-        </p>
-      ) : null}
     </>
+  );
+}
+
+function ScopeOption({
+  name,
+  value,
+  checked,
+  onChange,
+  label,
+}: {
+  name: string;
+  value: RoomPaintScope;
+  checked: boolean;
+  onChange: () => void;
+  label: string;
+}) {
+  return (
+    <label className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm font-black ${checked ? "border-moss bg-white text-moss" : "border-line bg-white text-ink"}`}>
+      <input type="radio" name={name} value={value} checked={checked} onChange={onChange} />
+      {label}
+    </label>
   );
 }
 

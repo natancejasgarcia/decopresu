@@ -70,16 +70,18 @@ create table if not exists public.rooms (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.projects(id) on delete cascade,
   name text not null,
-  length numeric(10, 2) not null check (length > 0),
-  width numeric(10, 2) not null check (width > 0),
-  height numeric(10, 2) not null check (height > 0),
+  length numeric(10, 2) not null check (length >= 0),
+  width numeric(10, 2) not null check (width >= 0),
+  height numeric(10, 2) not null check (height >= 0),
   ceiling_area numeric(10, 2) generated always as (round(length * width, 2)) stored,
   wall_area numeric(10, 2) generated always as (round(2 * (length + width) * height, 2)) stored,
   openings_area numeric(10, 2) not null default 0 check (openings_area >= 0),
-  paint_scope text not null default 'walls_and_ceiling' check (paint_scope in ('walls_and_ceiling', 'ceiling_only')),
+  manual_area numeric(10, 2) not null default 0 check (manual_area >= 0),
+  paint_scope text not null default 'walls_and_ceiling' check (paint_scope in ('walls_and_ceiling', 'ceiling_only', 'manual_area')),
   unit_price numeric(10, 2) not null default 6 check (unit_price >= 0),
   total_paintable_area numeric(10, 2) generated always as (
     case
+      when paint_scope = 'manual_area' then manual_area
       when paint_scope = 'ceiling_only' then round(length * width, 2)
       else greatest(round((length * width) + (2 * (length + width) * height) - openings_area, 2), 0)
     end

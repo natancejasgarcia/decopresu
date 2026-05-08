@@ -79,8 +79,18 @@ export async function createBudgetItemsFromRoomsAction(formData: FormData) {
     .filter((room) => Number(room.total_paintable_area) > 0)
     .map((room) => ({
       project_id: projectId,
-      concept: `${room.name} · ${room.paint_scope === "ceiling_only" ? "Solo techo" : "Techo y paredes"}`,
-      notes: room.notes || `${Number(room.length)} x ${Number(room.width)} x ${Number(room.height)} m`,
+      concept: `${room.name} · ${
+        room.paint_scope === "manual_area"
+          ? "Metro cuadrado"
+          : room.paint_scope === "ceiling_only"
+            ? "Solo techo"
+            : "Techo y paredes"
+      }`,
+      notes:
+        room.notes ||
+        (room.paint_scope === "manual_area"
+          ? `${Number(room.manual_area ?? room.total_paintable_area)} m2`
+          : `${Number(room.length)} x ${Number(room.width)} x ${Number(room.height)} m`),
       quantity: Number(room.total_paintable_area),
       unit: "m2",
       unit_price: Number(room.unit_price ?? 0),

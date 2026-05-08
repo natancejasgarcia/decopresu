@@ -301,7 +301,12 @@ export async function GET(_request: NextRequest, { params }: Context) {
     y -= 30;
   } else {
     for (const room of rooms) {
-      const scope = room.paint_scope === "ceiling_only" ? "Solo techo" : "Techo + paredes";
+      const scope =
+        room.paint_scope === "manual_area"
+          ? "Metro cuadrado"
+          : room.paint_scope === "ceiling_only"
+            ? "Solo techo"
+            : "Techo + paredes";
       const roomText = `${room.name} · ${scope}`;
       const notes = room.notes ? `Notas: ${room.notes}` : "";
       const roomLines = wrapText(roomText, fonts.bold, 7.8, 136);
@@ -320,12 +325,18 @@ export async function GET(_request: NextRequest, { params }: Context) {
       }
 
       const measures =
-        room.paint_scope === "ceiling_only"
+        room.paint_scope === "manual_area"
+          ? `${Number(room.manual_area ?? room.total_paintable_area).toFixed(2)} m2 directos`
+          : room.paint_scope === "ceiling_only"
           ? `${room.length} x ${room.width} techo`
           : `${room.length} x ${room.width} x ${room.height}`;
       page.drawText(measures, { x: 184, y: y - 12, size: 7.4, font: fonts.regular, color: INK });
-      page.drawText(`Techo ${Number(room.ceiling_area).toFixed(2)}`, { x: 184, y: y - 23, size: 6.7, font: fonts.regular, color: MUTED });
-      if (room.paint_scope !== "ceiling_only") {
+      if (room.paint_scope === "manual_area") {
+        page.drawText("Introducido manualmente", { x: 184, y: y - 23, size: 6.7, font: fonts.regular, color: MUTED });
+      } else {
+        page.drawText(`Techo ${Number(room.ceiling_area).toFixed(2)}`, { x: 184, y: y - 23, size: 6.7, font: fonts.regular, color: MUTED });
+      }
+      if (room.paint_scope !== "ceiling_only" && room.paint_scope !== "manual_area") {
         page.drawText(`Paredes ${Number(room.wall_area).toFixed(2)} · Desc. ${Number(room.openings_area).toFixed(2)}`, {
           x: 184,
           y: y - 32,
