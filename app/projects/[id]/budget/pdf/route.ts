@@ -284,22 +284,19 @@ export async function GET(_request: NextRequest, { params }: Context) {
     }
   }
 
-  y -= 16;
-  ({ page, y } = ensurePage(pdf, page, y, 95));
-  y = sectionTitle(page, "Desglose de medidas por habitación", y, fonts);
-  const roomHeaders = [
-    { label: "HABITACIÓN", x: MARGIN + 8, width: 140 },
-    { label: "MEDIDAS", x: 184, width: 115 },
-    { label: "M2", x: 318, width: 40, align: "right" as const },
-    { label: "€/M2", x: 370, width: 52, align: "right" as const },
-    { label: "IMPORTE", x: 464, width: 60, align: "right" as const },
-  ];
-  y = drawTableHeader(page, y, roomHeaders, fonts);
+  if (rooms.length > 0) {
+    y -= 16;
+    ({ page, y } = ensurePage(pdf, page, y, 95));
+    y = sectionTitle(page, "Desglose de medidas por habitación", y, fonts);
+    const roomHeaders = [
+      { label: "HABITACIÓN", x: MARGIN + 8, width: 140 },
+      { label: "MEDIDAS", x: 184, width: 115 },
+      { label: "M2", x: 318, width: 40, align: "right" as const },
+      { label: "€/M2", x: 370, width: 52, align: "right" as const },
+      { label: "IMPORTE", x: 464, width: 60, align: "right" as const },
+    ];
+    y = drawTableHeader(page, y, roomHeaders, fonts);
 
-  if (rooms.length === 0) {
-    page.drawText("No hay habitaciones medidas.", { x: MARGIN + 8, y: y - 12, size: 8, font: fonts.regular, color: MUTED });
-    y -= 30;
-  } else {
     for (const room of rooms) {
       const scope =
         room.paint_scope === "manual_area"
