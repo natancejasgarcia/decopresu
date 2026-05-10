@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
+import { DashboardStats } from "@/components/DashboardStats";
 import { TopBar } from "@/components/TopBar";
 import { ProjectCard } from "@/components/ProjectCard";
 import { requireUserProfile } from "@/lib/auth";
@@ -12,6 +13,12 @@ type DashboardPageProps = {
     q?: string;
     status?: ProjectStatus | "Todos";
   };
+};
+
+type DashboardBudgetItem = {
+  project_id: string;
+  total: number;
+  created_at: string;
 };
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
@@ -33,10 +40,23 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     query = query.or(`name.ilike.${term},client_name.ilike.${term},address.ilike.${term}`);
   }
 
-  const { data: projects, error } = await query.returns<Project[]>();
+  const [
+    { data: projects, error },
+    { data: allProjects, error: allProjectsError },
+    { data: budgetItems, error: budgetItemsError },
+  ] = await Promise.all([
+    query.returns<Project[]>(),
+    supabase.from("projects").select("*").order("created_at", { ascending: false }).returns<Project[]>(),
+    supabase.from("budget_items").select("project_id,total,created_at").returns<DashboardBudgetItem[]>(),
+  ]);
 
-  if (error) {
-    throw new Error(error.message);
+  if (error || allProjectsError || budgetItemsError) {
+    throw new Error(error?.message ?? allProjectsError?.message ?? budgetItemsError?.message);
+  }
+
+  const projectBudgetTotals = new Map<string, number>();
+  for (const item of budgetItems ?? []) {
+    projectBudgetTotals.set(item.project_id, (projectBudgetTotals.get(item.project_id) ?? 0) + Number(item.total));
   }
 
   return (
@@ -54,6 +74,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </Link>
         </div>
 
+        <DashboardStats projects={allProjects ?? []} budgetItems={budgetItems ?? []} />
+
         <form className="mt-5 grid gap-3 rounded-lg border border-line bg-white p-3 shadow-soft md:grid-cols-[1fr_220px_auto]">
           <label className="flex h-12 items-center gap-2 rounded-lg bg-paper px-3">
             <Search size={18} className="text-muted" />
@@ -70,7 +92,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
         <section className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {projects?.length ? (
-            projects.map((project) => <ProjectCard key={project.id} project={project} />)
+            projects.map((project) => <ProjectCard key={project.id} project={project} budgetTotal={projectBudgetTotals.get(project.id) ?? 0} />)
           ) : (
             <div className="col-span-full rounded-lg border border-dashed border-line bg-white p-8 text-center">
               <h2 className="text-xl font-black text-ink">No hay proyectos todavia</h2>
