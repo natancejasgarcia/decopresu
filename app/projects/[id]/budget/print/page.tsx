@@ -167,8 +167,8 @@ export default async function PrintBudgetPage({ params }: PrintBudgetPageProps) 
                 items.map((item) => (
                   <tr key={item.id} className="border-b border-[#d8ddd8] align-top">
                     <td className="px-3 py-4 font-bold text-[#152630]">{item.concept}</td>
-                    <td className="px-3 py-4 text-right">{Number(item.quantity)} {item.unit}</td>
-                    <td className="px-3 py-4 text-right">{formatCurrency(Number(item.unit_price))}</td>
+                    <td className="px-3 py-4 text-right">{item.unit ? `${Number(item.quantity)} ${item.unit}` : ""}</td>
+                    <td className="px-3 py-4 text-right">{item.unit ? formatCurrency(Number(item.unit_price)) : ""}</td>
                     <td className="px-3 py-4 text-right font-black">{formatCurrency(Number(item.total))}</td>
                   </tr>
                 ))

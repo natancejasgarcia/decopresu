@@ -9,8 +9,8 @@ const budgetItemSchema = z.object({
   project_id: z.string().uuid(),
   concept: z.string().trim().min(2),
   notes: z.string().trim().optional(),
-  quantity: z.coerce.number().positive(),
-  unit: z.string().trim().min(1),
+  quantity: z.preprocess((value) => (value === "" || value === null ? 1 : value), z.coerce.number().positive()),
+  unit: z.preprocess((value) => (typeof value === "string" ? value.trim() : ""), z.string()),
   unit_price: z.coerce.number().min(0),
 });
 

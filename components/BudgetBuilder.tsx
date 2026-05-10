@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useTransition } from "react";
+import { FormEvent, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Calculator, Download, ReceiptText, Trash2 } from "lucide-react";
@@ -28,6 +28,7 @@ const CONCEPTS = [
 export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [isFixedPrice, setIsFixedPrice] = useState(false);
   const total = useMemo(() => items.reduce((sum, item) => sum + Number(item.total), 0), [items]);
   const roomArea = useMemo(
     () => rooms.reduce((sum, room) => sum + Number(room.total_paintable_area), 0),
@@ -45,6 +46,7 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
     startTransition(async () => {
       await createBudgetItemAction(formData);
       form.reset();
+      setIsFixedPrice(false);
       router.refresh();
     });
   }
@@ -103,30 +105,58 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
         <input type="hidden" name="project_id" value={projectId} />
         <div>
           <label className="form-label" htmlFor="concept">Concepto</label>
-          <select className="form-input" id="concept" name="concept" defaultValue="Pintura paredes">
+          <input
+            className="form-input"
+            id="concept"
+            name="concept"
+            list="budget-concepts"
+            placeholder="Pintura paredes, materiales, mano de obra..."
+            required
+          />
+          <datalist id="budget-concepts">
             {CONCEPTS.map((concept) => (
-              <option key={concept} value={concept}>{concept}</option>
+              <option key={concept} value={concept} />
             ))}
-          </select>
+          </datalist>
         </div>
         <div>
           <label className="form-label" htmlFor="notes">Notas del concepto</label>
           <textarea className="form-input min-h-20" id="notes" name="notes" placeholder="Detalle del trabajo, acabado, materiales o condiciones..." />
         </div>
-        <div className="grid grid-cols-3 gap-3">
+
+        <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-line bg-white px-3 text-sm font-black text-ink">
+          <input
+            className="h-4 w-4 accent-moss"
+            type="checkbox"
+            checked={isFixedPrice}
+            onChange={(event) => setIsFixedPrice(event.target.checked)}
+          />
+          Solo precio, sin cantidad ni unidad
+        </label>
+
+        {isFixedPrice ? (
           <div>
-            <label className="form-label" htmlFor="quantity">Cantidad</label>
-            <input className="form-input" id="quantity" name="quantity" type="number" min="0.01" step="0.01" defaultValue="1" required />
-          </div>
-          <div>
-            <label className="form-label" htmlFor="unit">Unidad</label>
-            <input className="form-input" id="unit" name="unit" defaultValue="m2" required />
-          </div>
-          <div>
-            <label className="form-label" htmlFor="unit_price">Precio</label>
+            <input type="hidden" name="quantity" value="1" />
+            <input type="hidden" name="unit" value="" />
+            <label className="form-label" htmlFor="unit_price">Precio final</label>
             <input className="form-input" id="unit_price" name="unit_price" type="number" min="0" step="0.01" defaultValue="0" required />
           </div>
-        </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="form-label" htmlFor="quantity">Cantidad</label>
+              <input className="form-input" id="quantity" name="quantity" type="number" min="0.01" step="0.01" defaultValue="1" required />
+            </div>
+            <div>
+              <label className="form-label" htmlFor="unit">Unidad</label>
+              <input className="form-input" id="unit" name="unit" placeholder="m2, ud, horas..." defaultValue="m2" required />
+            </div>
+            <div>
+              <label className="form-label" htmlFor="unit_price">Precio</label>
+              <input className="form-input" id="unit_price" name="unit_price" type="number" min="0" step="0.01" defaultValue="0" required />
+            </div>
+          </div>
+        )}
         <button className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-moss px-4 font-black text-white disabled:opacity-60" disabled={isPending}>
           <ReceiptText size={18} />
           Añadir línea
@@ -141,7 +171,9 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
             <article key={item.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-line bg-white p-3">
               <div>
                 <strong className="block text-ink">{item.concept}</strong>
-                <span className="text-sm text-muted">{Number(item.quantity)} {item.unit} x {formatCurrency(Number(item.unit_price))}</span>
+                <span className="text-sm text-muted">
+                  {item.unit ? `${Number(item.quantity)} ${item.unit} x ${formatCurrency(Number(item.unit_price))}` : "Precio cerrado"}
+                </span>
                 {item.notes ? <p className="mt-1 text-sm text-muted">{item.notes}</p> : null}
               </div>
               <strong className="text-ink">{formatCurrency(Number(item.total))}</strong>

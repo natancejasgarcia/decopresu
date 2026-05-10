@@ -274,10 +274,14 @@ export async function GET(_request: NextRequest, { params }: Context) {
         page.drawText(line, { x: MARGIN + 8, y: textY, size: 7.2, font: fonts.regular, color: MUTED });
         textY -= 9;
       }
-      const qty = `${Number(item.quantity)} ${item.unit}`;
-      page.drawText(qty, { x: 388 - fonts.regular.widthOfTextAtSize(qty, 7.6), y: y - 12, size: 7.6, font: fonts.regular, color: INK });
-      const price = money(Number(item.unit_price));
-      page.drawText(price, { x: 458 - fonts.regular.widthOfTextAtSize(price, 7.6), y: y - 12, size: 7.6, font: fonts.regular, color: INK });
+      const qty = item.unit ? `${Number(item.quantity)} ${item.unit}` : "";
+      if (qty) {
+        page.drawText(qty, { x: 388 - fonts.regular.widthOfTextAtSize(qty, 7.6), y: y - 12, size: 7.6, font: fonts.regular, color: INK });
+      }
+      const price = item.unit ? money(Number(item.unit_price)) : "";
+      if (price) {
+        page.drawText(price, { x: 458 - fonts.regular.widthOfTextAtSize(price, 7.6), y: y - 12, size: 7.6, font: fonts.regular, color: INK });
+      }
       const amount = money(Number(item.total));
       page.drawText(amount, { x: 524 - fonts.bold.widthOfTextAtSize(amount, 7.8), y: y - 12, size: 7.8, font: fonts.bold, color: INK });
       y -= rowHeight;
