@@ -15,6 +15,10 @@ export const PROJECT_STATUSES: ProjectStatus[] = [
   "Cobrado",
 ];
 
+export type ProjectType = "Pintura" | "Laca";
+
+export const PROJECT_TYPES: ProjectType[] = ["Pintura", "Laca"];
+
 export type RoomPaintScope = "walls_and_ceiling" | "ceiling_only" | "walls_only" | "manual_area";
 
 export type Profile = {
@@ -34,6 +38,7 @@ export type Project = {
   address: string;
   description: string;
   status: ProjectStatus;
+  project_type: ProjectType;
   internal_notes: string | null;
   created_by: string | null;
   created_at: string;

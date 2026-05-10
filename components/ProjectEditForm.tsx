@@ -1,5 +1,5 @@
 import { updateProjectAction } from "@/actions/projectActions";
-import { PROJECT_STATUSES, type Project } from "@/lib/types";
+import { PROJECT_STATUSES, PROJECT_TYPES, type Project } from "@/lib/types";
 
 type ProjectEditFormProps = {
   project: Project;
@@ -12,6 +12,14 @@ export function ProjectEditForm({ project }: ProjectEditFormProps) {
       <div>
         <label className="form-label" htmlFor="edit-name">Nombre del proyecto</label>
         <input className="form-input" id="edit-name" name="name" required defaultValue={project.name} />
+      </div>
+      <div>
+        <label className="form-label" htmlFor="edit-project-type">Tipo de obra</label>
+        <select className="form-input" id="edit-project-type" name="project_type" defaultValue={project.project_type ?? "Pintura"}>
+          {PROJECT_TYPES.map((type) => (
+            <option key={type} value={type}>{type}</option>
+          ))}
+        </select>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>

@@ -41,6 +41,7 @@ create table if not exists public.projects (
   address text not null,
   description text not null,
   status public.project_status not null default 'Pendiente',
+  project_type text not null default 'Pintura' check (project_type in ('Pintura', 'Laca')),
   internal_notes text,
   created_by uuid references public.profiles(user_id) on delete set null,
   created_at timestamptz not null default now(),
@@ -111,6 +112,7 @@ for each row execute function public.set_updated_at();
 create index if not exists profiles_user_id_idx on public.profiles(user_id);
 create index if not exists projects_created_at_idx on public.projects(created_at desc);
 create index if not exists projects_status_idx on public.projects(status);
+create index if not exists projects_project_type_idx on public.projects(project_type);
 create index if not exists projects_last_activity_at_idx on public.projects(last_activity_at desc);
 create index if not exists messages_project_id_created_at_idx on public.messages(project_id, created_at);
 create index if not exists project_files_project_id_created_at_idx on public.project_files(project_id, created_at desc);

@@ -1,5 +1,5 @@
 import { createProjectAction } from "@/actions/projectActions";
-import { PROJECT_STATUSES } from "@/lib/types";
+import { PROJECT_STATUSES, PROJECT_TYPES } from "@/lib/types";
 
 export function ProjectForm() {
   return (
@@ -7,6 +7,14 @@ export function ProjectForm() {
       <div>
         <label className="form-label" htmlFor="name">Nombre del proyecto</label>
         <input className="form-input" id="name" name="name" required placeholder="Piso Gran Via" />
+      </div>
+      <div>
+        <label className="form-label" htmlFor="project_type">Tipo de obra</label>
+        <select className="form-input" id="project_type" name="project_type" defaultValue="Pintura">
+          {PROJECT_TYPES.map((type) => (
+            <option key={type} value={type}>{type}</option>
+          ))}
+        </select>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>

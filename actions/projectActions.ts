@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUserProfile } from "@/lib/auth";
-import { PROJECT_STATUSES } from "@/lib/types";
+import { PROJECT_STATUSES, PROJECT_TYPES } from "@/lib/types";
 
 const projectSchema = z.object({
   name: z.string().trim().min(2, "El proyecto necesita un nombre."),
@@ -14,6 +14,7 @@ const projectSchema = z.object({
   address: z.string().trim().min(3, "Indica la direccion."),
   description: z.string().trim().min(3, "Describe el trabajo."),
   status: z.enum(PROJECT_STATUSES as [string, ...string[]]),
+  project_type: z.enum(PROJECT_TYPES as [string, ...string[]]).default("Pintura"),
   internal_notes: z.string().trim().optional(),
 });
 

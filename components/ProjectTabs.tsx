@@ -58,6 +58,7 @@ export function ProjectTabs({
               <h2>Resumen</h2>
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-paper px-3 py-1 text-sm font-black text-steel">{project.status}</span>
+                <span className="rounded-full bg-paper px-3 py-1 text-sm font-black text-moss">{project.project_type ?? "Pintura"}</span>
                 <button
                   className="h-10 rounded-lg border border-line px-3 text-sm font-black text-ink"
                   onClick={() => setIsEditingProject((current) => !current)}
@@ -75,6 +76,7 @@ export function ProjectTabs({
                   <div className="rounded-lg bg-paper p-4">
                     <p className="text-xs font-black uppercase text-muted">Cliente</p>
                     <h3 className="mt-1 text-xl font-black text-ink">{project.client_name}</h3>
+                    <p className="mt-1 text-sm font-black text-moss">{project.project_type ?? "Pintura"}</p>
                     <p className="mt-2 text-sm leading-6 text-muted">{project.address}</p>
                     <p className="mt-2 text-sm leading-6 text-muted">{project.client_phone}</p>
                     {project.client_email ? <p className="mt-2 text-sm leading-6 text-muted">{project.client_email}</p> : null}

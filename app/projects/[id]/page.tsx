@@ -72,7 +72,10 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         <section className="my-5 rounded-lg border border-line bg-white p-4 shadow-soft">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
-              <p className="text-xs font-black uppercase text-clay">{project.status}</p>
+              <div className="flex flex-wrap gap-2">
+                <p className="rounded-full bg-paper px-3 py-1 text-xs font-black uppercase text-clay">{project.status}</p>
+                <p className="rounded-full bg-paper px-3 py-1 text-xs font-black uppercase text-moss">{project.project_type ?? "Pintura"}</p>
+              </div>
               <h1 className="mt-1 text-3xl font-black leading-tight text-ink sm:text-4xl">{project.name}</h1>
               <p className="mt-2 text-sm font-semibold text-muted">{project.client_name} · {project.address}</p>
             </div>

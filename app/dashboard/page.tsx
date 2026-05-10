@@ -4,7 +4,7 @@ import { DashboardStats } from "@/components/DashboardStats";
 import { TopBar } from "@/components/TopBar";
 import { ProjectCard } from "@/components/ProjectCard";
 import { requireUserProfile } from "@/lib/auth";
-import { PROJECT_STATUSES, type Project, type ProjectStatus } from "@/lib/types";
+import { PROJECT_STATUSES, PROJECT_TYPES, type Project, type ProjectStatus, type ProjectType } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +12,7 @@ type DashboardPageProps = {
   searchParams: {
     q?: string;
     status?: ProjectStatus | "Todos";
+    type?: ProjectType | "Todos";
   };
 };
 
@@ -25,6 +26,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const { supabase, profile } = await requireUserProfile();
   const q = searchParams.q?.trim() ?? "";
   const status = searchParams.status ?? "Todos";
+  const projectType: ProjectType | "Todos" = PROJECT_TYPES.includes(searchParams.type as ProjectType) ? (searchParams.type as ProjectType) : "Todos";
 
   let query = supabase
     .from("projects")
@@ -33,6 +35,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   if (status !== "Todos") {
     query = query.eq("status", status);
+  }
+
+  if (projectType !== "Todos") {
+    query = query.eq("project_type", projectType);
   }
 
   if (q) {
@@ -58,6 +64,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   for (const item of budgetItems ?? []) {
     projectBudgetTotals.set(item.project_id, (projectBudgetTotals.get(item.project_id) ?? 0) + Number(item.total));
   }
+  const metricProjects = projectType === "Todos" ? (allProjects ?? []) : (allProjects ?? []).filter((project) => project.project_type === projectType);
+  const metricProjectIds = new Set(metricProjects.map((project) => project.id));
+  const metricBudgetItems = projectType === "Todos" ? (budgetItems ?? []) : (budgetItems ?? []).filter((item) => metricProjectIds.has(item.project_id));
 
   return (
     <main className="min-h-screen pb-24">
@@ -74,9 +83,16 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </Link>
         </div>
 
-        <DashboardStats projects={allProjects ?? []} budgetItems={budgetItems ?? []} />
+        <DashboardStats projects={metricProjects} budgetItems={metricBudgetItems} />
 
         <form className="mt-5 grid gap-3 rounded-lg border border-line bg-white p-3 shadow-soft md:grid-cols-[1fr_220px_auto]">
+          <div className="flex flex-wrap gap-2 md:col-span-3">
+            <ProjectTypeTab label="Todos" value="Todos" activeType={projectType} q={q} status={status} />
+            {PROJECT_TYPES.map((type) => (
+              <ProjectTypeTab key={type} label={type} value={type} activeType={projectType} q={q} status={status} />
+            ))}
+          </div>
+          <input type="hidden" name="type" value={projectType} />
           <label className="flex h-12 items-center gap-2 rounded-lg bg-paper px-3">
             <Search size={18} className="text-muted" />
             <input className="w-full bg-transparent text-sm font-semibold outline-none" name="q" defaultValue={q} placeholder="Buscar proyecto, cliente o direccion" />
@@ -102,5 +118,44 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </section>
       </div>
     </main>
+  );
+}
+
+function ProjectTypeTab({
+  label,
+  value,
+  activeType,
+  q,
+  status,
+}: {
+  label: string;
+  value: ProjectType | "Todos";
+  activeType: ProjectType | "Todos";
+  q: string;
+  status: ProjectStatus | "Todos";
+}) {
+  const params = new URLSearchParams();
+  if (q) {
+    params.set("q", q);
+  }
+  if (status !== "Todos") {
+    params.set("status", status);
+  }
+  if (value !== "Todos") {
+    params.set("type", value);
+  }
+
+  const href = params.toString() ? `/dashboard?${params.toString()}` : "/dashboard";
+  const isActive = activeType === value;
+
+  return (
+    <Link
+      href={href}
+      className={`inline-flex h-10 items-center rounded-lg px-4 text-sm font-black ${
+        isActive ? "bg-moss text-white" : "bg-paper text-ink ring-1 ring-line"
+      }`}
+    >
+      {label}
+    </Link>
   );
 }

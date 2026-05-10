@@ -54,9 +54,14 @@ export function ProjectCard({ project, budgetTotal = 0 }: ProjectCardProps) {
           <h2 className="text-lg font-black text-ink">{project.name}</h2>
           <p className="mt-1 text-sm font-semibold text-muted">{project.client_name}</p>
         </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-black ${statusStyle.badge}`}>
-          {project.status}
-        </span>
+        <div className="flex flex-col items-end gap-2">
+          <span className={`rounded-full px-3 py-1 text-xs font-black ${statusStyle.badge}`}>
+            {project.status}
+          </span>
+          <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-black text-moss ring-1 ring-line">
+            {project.project_type ?? "Pintura"}
+          </span>
+        </div>
       </div>
       <p className="mt-3 inline-flex items-center gap-2 rounded-lg bg-white/75 px-3 py-2 text-sm font-black text-ink ring-1 ring-line">
         <Euro size={15} className="text-moss" />
