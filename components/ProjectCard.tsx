@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Euro, MapPin, MessageSquareText } from "lucide-react";
+import { DeleteProjectButton } from "@/components/DeleteProjectButton";
 import { formatCurrency, formatDate } from "@/lib/calculations";
 import type { Project, ProjectStatus } from "@/lib/types";
 
@@ -45,39 +46,41 @@ export function ProjectCard({ project, budgetTotal = 0 }: ProjectCardProps) {
   const statusStyle = STATUS_STYLES[project.status];
 
   return (
-    <Link
-      href={`/projects/${project.id}`}
-      className={`block rounded-lg border p-4 shadow-soft transition hover:-translate-y-0.5 hover:border-moss ${statusStyle.border} ${statusStyle.wash}`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-black text-ink">{project.name}</h2>
-          <p className="mt-1 text-sm font-semibold text-muted">{project.client_name}</p>
+    <article className={`rounded-lg border p-4 shadow-soft transition hover:-translate-y-0.5 hover:border-moss ${statusStyle.border} ${statusStyle.wash}`}>
+      <Link href={`/projects/${project.id}`} className="block">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black text-ink">{project.name}</h2>
+            <p className="mt-1 text-sm font-semibold text-muted">{project.client_name}</p>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <span className={`rounded-full px-3 py-1 text-xs font-black ${statusStyle.badge}`}>
+              {project.status}
+            </span>
+            <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-black text-moss ring-1 ring-line">
+              {project.project_type ?? "Pintura"}
+            </span>
+          </div>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <span className={`rounded-full px-3 py-1 text-xs font-black ${statusStyle.badge}`}>
-            {project.status}
-          </span>
-          <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-black text-moss ring-1 ring-line">
-            {project.project_type ?? "Pintura"}
+        <p className="mt-3 inline-flex items-center gap-2 rounded-lg bg-white/75 px-3 py-2 text-sm font-black text-ink ring-1 ring-line">
+          <Euro size={15} className="text-moss" />
+          {formatCurrency(budgetTotal)}
+        </p>
+        <p className="mt-3 flex items-center gap-2 text-sm text-muted">
+          <MapPin size={16} />
+          {project.address}
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted">
+          <span>Creado: {formatDate(project.created_at)}</span>
+          <span className="flex items-center justify-end gap-1">
+            <MessageSquareText size={14} />
+            {formatDate(project.last_activity_at)}
           </span>
         </div>
+      </Link>
+      <div className="mt-4 flex justify-end">
+        <DeleteProjectButton projectId={project.id} projectName={project.name} />
       </div>
-      <p className="mt-3 inline-flex items-center gap-2 rounded-lg bg-white/75 px-3 py-2 text-sm font-black text-ink ring-1 ring-line">
-        <Euro size={15} className="text-moss" />
-        {formatCurrency(budgetTotal)}
-      </p>
-      <p className="mt-3 flex items-center gap-2 text-sm text-muted">
-        <MapPin size={16} />
-        {project.address}
-      </p>
-      <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted">
-        <span>Creado: {formatDate(project.created_at)}</span>
-        <span className="flex items-center justify-end gap-1">
-          <MessageSquareText size={14} />
-          {formatDate(project.last_activity_at)}
-        </span>
-      </div>
-    </Link>
+    </article>
   );
 }

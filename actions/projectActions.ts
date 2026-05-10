@@ -89,3 +89,40 @@ export async function updateProjectAction(formData: FormData) {
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/dashboard");
 }
+
+export async function deleteProjectAction(formData: FormData) {
+  const { supabase } = await requireUserProfile();
+  const projectId = z.string().uuid().parse(formData.get("project_id"));
+
+  const { data: files, error: filesError } = await supabase
+    .from("project_files")
+    .select("file_url")
+    .eq("project_id", projectId);
+
+  if (filesError) {
+    throw new Error(filesError.message);
+  }
+
+  const filePaths = (files ?? [])
+    .map((file) => String(file.file_url || ""))
+    .filter(Boolean);
+
+  if (filePaths.length > 0) {
+    const { error: storageError } = await supabase.storage.from("project-files").remove(filePaths);
+
+    if (storageError) {
+      throw new Error(storageError.message);
+    }
+  }
+
+  const { error } = await supabase
+    .from("projects")
+    .delete()
+    .eq("id", projectId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/dashboard");
+}
