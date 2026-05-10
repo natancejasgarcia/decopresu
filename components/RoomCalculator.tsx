@@ -94,7 +94,7 @@ export function RoomCalculator({ projectId, rooms }: RoomCalculatorProps) {
       <div className="section-heading">
         <div>
           <h2>Plano por habitaciones</h2>
-          <p className="mt-1 text-sm font-semibold text-muted">Elige techo + paredes, solo techo o mete los m2 directos.</p>
+          <p className="mt-1 text-sm font-semibold text-muted">Elige techo + paredes, solo techo, solo paredes o mete los m2 directos.</p>
         </div>
         <span className="rounded-full bg-paper px-3 py-1 text-sm font-black text-moss">
           {projectTotal.toFixed(2)} m2
@@ -142,7 +142,8 @@ export function RoomCalculator({ projectId, rooms }: RoomCalculatorProps) {
             const roomPrice = Number(room.unit_price ?? 0);
             const isCeilingOnly = room.paint_scope === "ceiling_only";
             const isManualArea = room.paint_scope === "manual_area";
-            const scopeLabel = isManualArea ? "Metro cuadrado" : isCeilingOnly ? "Solo techo" : "Techo + paredes";
+            const isWallsOnly = room.paint_scope === "walls_only";
+            const scopeLabel = isManualArea ? "Metro cuadrado" : isCeilingOnly ? "Solo techo" : isWallsOnly ? "Solo paredes" : "Techo + paredes";
 
             if (editingRoomId === room.id) {
               return (
@@ -233,9 +234,10 @@ function RoomFields({ room }: { room?: Room }) {
         <label className="form-label" htmlFor={`room-name-${idPrefix}`}>Habitación o zona</label>
         <input className="form-input" id={`room-name-${idPrefix}`} name="name" required defaultValue={room?.name ?? ""} placeholder="Salón, pasillo, dormitorio, fachada..." />
       </div>
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="grid gap-2 sm:grid-cols-4">
         <ScopeOption name="paint_scope" value="walls_and_ceiling" checked={scope === "walls_and_ceiling"} onChange={() => setScope("walls_and_ceiling")} label="Techo + paredes" />
         <ScopeOption name="paint_scope" value="ceiling_only" checked={scope === "ceiling_only"} onChange={() => setScope("ceiling_only")} label="Solo techo" />
+        <ScopeOption name="paint_scope" value="walls_only" checked={scope === "walls_only"} onChange={() => setScope("walls_only")} label="Solo paredes" />
         <ScopeOption name="paint_scope" value="manual_area" checked={scope === "manual_area"} onChange={() => setScope("manual_area")} label="Metro cuadrado" />
       </div>
 

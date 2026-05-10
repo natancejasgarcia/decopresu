@@ -15,7 +15,7 @@ export const PROJECT_STATUSES: ProjectStatus[] = [
   "Cobrado",
 ];
 
-export type RoomPaintScope = "walls_and_ceiling" | "ceiling_only" | "manual_area";
+export type RoomPaintScope = "walls_and_ceiling" | "ceiling_only" | "walls_only" | "manual_area";
 
 export type Profile = {
   id: string;

@@ -12,7 +12,7 @@ const roomSchema = z.object({
   height: z.coerce.number().min(0).default(0),
   openings_area: z.coerce.number().min(0).default(0),
   manual_area: z.coerce.number().min(0).default(0),
-  paint_scope: z.enum(["walls_and_ceiling", "ceiling_only", "manual_area"]).default("walls_and_ceiling"),
+  paint_scope: z.enum(["walls_and_ceiling", "ceiling_only", "walls_only", "manual_area"]).default("walls_and_ceiling"),
   unit_price: z.coerce.number().min(0).default(6),
   notes: z.string().trim().optional(),
 });

@@ -4,7 +4,7 @@ export type RoomInput = {
   height: number;
   openingsArea: number;
   manualArea?: number;
-  paintScope?: "walls_and_ceiling" | "ceiling_only" | "manual_area";
+  paintScope?: "walls_and_ceiling" | "ceiling_only" | "walls_only" | "manual_area";
 };
 
 const roundMoney = (value: number) => Math.round(value * 100) / 100;
@@ -17,6 +17,8 @@ export function calculateRoomAreas(input: RoomInput) {
       ? Math.max(input.manualArea ?? 0, 0)
       : input.paintScope === "ceiling_only"
       ? ceilingArea
+      : input.paintScope === "walls_only"
+      ? Math.max(wallArea - input.openingsArea, 0)
       : Math.max(ceilingArea + wallArea - input.openingsArea, 0);
 
   return {

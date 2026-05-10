@@ -303,6 +303,8 @@ export async function GET(_request: NextRequest, { params }: Context) {
           ? "Metro cuadrado"
           : room.paint_scope === "ceiling_only"
             ? "Solo techo"
+            : room.paint_scope === "walls_only"
+              ? "Solo paredes"
             : "Techo + paredes";
       const roomText = `${room.name} · ${scope}`;
       const notes = room.notes ? `Notas: ${room.notes}` : "";
@@ -326,6 +328,8 @@ export async function GET(_request: NextRequest, { params }: Context) {
           ? `${Number(room.manual_area ?? room.total_paintable_area).toFixed(2)} m2 directos`
           : room.paint_scope === "ceiling_only"
           ? `${room.length} x ${room.width} techo`
+          : room.paint_scope === "walls_only"
+          ? `${room.length} x ${room.width} x ${room.height} paredes`
           : `${room.length} x ${room.width} x ${room.height}`;
       page.drawText(measures, { x: 184, y: y - 12, size: 7.4, font: fonts.regular, color: INK });
       if (room.paint_scope === "manual_area") {

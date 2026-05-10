@@ -77,12 +77,13 @@ create table if not exists public.rooms (
   wall_area numeric(10, 2) generated always as (round(2 * (length + width) * height, 2)) stored,
   openings_area numeric(10, 2) not null default 0 check (openings_area >= 0),
   manual_area numeric(10, 2) not null default 0 check (manual_area >= 0),
-  paint_scope text not null default 'walls_and_ceiling' check (paint_scope in ('walls_and_ceiling', 'ceiling_only', 'manual_area')),
+  paint_scope text not null default 'walls_and_ceiling' check (paint_scope in ('walls_and_ceiling', 'ceiling_only', 'walls_only', 'manual_area')),
   unit_price numeric(10, 2) not null default 6 check (unit_price >= 0),
   total_paintable_area numeric(10, 2) generated always as (
     case
       when paint_scope = 'manual_area' then manual_area
       when paint_scope = 'ceiling_only' then round(length * width, 2)
+      when paint_scope = 'walls_only' then greatest(round((2 * (length + width) * height) - openings_area, 2), 0)
       else greatest(round((length * width) + (2 * (length + width) * height) - openings_area, 2), 0)
     end
   ) stored,

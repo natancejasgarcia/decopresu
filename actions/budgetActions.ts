@@ -88,6 +88,8 @@ export async function createBudgetItemsFromRoomsAction(formData: FormData) {
           ? "Metro cuadrado"
           : room.paint_scope === "ceiling_only"
             ? "Solo techo"
+            : room.paint_scope === "walls_only"
+              ? "Solo paredes"
             : "Techo y paredes"
       }`,
       notes:
