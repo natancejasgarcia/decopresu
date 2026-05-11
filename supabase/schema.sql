@@ -67,6 +67,15 @@ create table if not exists public.project_reads (
   unique (project_id, user_id)
 );
 
+create table if not exists public.dashboard_dismissals (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(user_id) on delete cascade,
+  item_key text not null,
+  dismissed_on date not null default current_date,
+  created_at timestamptz not null default now(),
+  unique (user_id, item_key, dismissed_on)
+);
+
 create table if not exists public.project_files (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.projects(id) on delete cascade,
@@ -131,6 +140,7 @@ create index if not exists projects_project_type_idx on public.projects(project_
 create index if not exists projects_last_activity_at_idx on public.projects(last_activity_at desc);
 create index if not exists messages_project_id_created_at_idx on public.messages(project_id, created_at);
 create index if not exists project_reads_user_project_idx on public.project_reads(user_id, project_id);
+create index if not exists dashboard_dismissals_user_day_idx on public.dashboard_dismissals(user_id, dismissed_on);
 create index if not exists project_files_project_id_created_at_idx on public.project_files(project_id, created_at desc);
 create index if not exists rooms_project_id_created_at_idx on public.rooms(project_id, created_at desc);
 create index if not exists budget_items_project_id_created_at_idx on public.budget_items(project_id, created_at);
@@ -139,6 +149,7 @@ alter table public.profiles enable row level security;
 alter table public.projects enable row level security;
 alter table public.messages enable row level security;
 alter table public.project_reads enable row level security;
+alter table public.dashboard_dismissals enable row level security;
 alter table public.project_files enable row level security;
 alter table public.rooms enable row level security;
 alter table public.budget_items enable row level security;
@@ -201,6 +212,18 @@ create policy "project_reads_update_own"
 on public.project_reads for update
 to authenticated
 using (public.is_decoralia_user() and user_id = auth.uid())
+with check (public.is_decoralia_user() and user_id = auth.uid());
+
+drop policy if exists "dashboard_dismissals_select_own" on public.dashboard_dismissals;
+create policy "dashboard_dismissals_select_own"
+on public.dashboard_dismissals for select
+to authenticated
+using (public.is_decoralia_user() and user_id = auth.uid());
+
+drop policy if exists "dashboard_dismissals_insert_own" on public.dashboard_dismissals;
+create policy "dashboard_dismissals_insert_own"
+on public.dashboard_dismissals for insert
+to authenticated
 with check (public.is_decoralia_user() and user_id = auth.uid());
 
 drop policy if exists "project_files_all_authorized" on public.project_files;

@@ -3,6 +3,7 @@ import { Plus, Search } from "lucide-react";
 import { DashboardStats } from "@/components/DashboardStats";
 import { TopBar } from "@/components/TopBar";
 import { ProjectCard } from "@/components/ProjectCard";
+import { TodayPanel, type TodayCard } from "@/components/TodayPanel";
 import { requireUserProfile } from "@/lib/auth";
 import { PROJECT_STATUSES, PROJECT_TYPES, type Message, type Project, type ProjectRead, type ProjectStatus, type ProjectType } from "@/lib/types";
 
@@ -52,16 +53,22 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     { data: budgetItems, error: budgetItemsError },
     { data: messages, error: messagesError },
     { data: projectReads, error: projectReadsError },
+    { data: dismissedItems, error: dismissedItemsError },
   ] = await Promise.all([
     query.returns<Project[]>(),
     supabase.from("projects").select("*").order("created_at", { ascending: false }).returns<Project[]>(),
     supabase.from("budget_items").select("project_id,total,created_at").returns<DashboardBudgetItem[]>(),
     supabase.from("messages").select("id,project_id,user_id,text,created_at").returns<Message[]>(),
     supabase.from("project_reads").select("*").eq("user_id", user.id).returns<ProjectRead[]>(),
+    supabase
+      .from("dashboard_dismissals")
+      .select("item_key")
+      .eq("user_id", user.id)
+      .eq("dismissed_on", new Date().toISOString().slice(0, 10)),
   ]);
 
-  if (error || allProjectsError || budgetItemsError || messagesError || projectReadsError) {
-    throw new Error(error?.message ?? allProjectsError?.message ?? budgetItemsError?.message ?? messagesError?.message ?? projectReadsError?.message);
+  if (error || allProjectsError || budgetItemsError || messagesError || projectReadsError || dismissedItemsError) {
+    throw new Error(error?.message ?? allProjectsError?.message ?? budgetItemsError?.message ?? messagesError?.message ?? projectReadsError?.message ?? dismissedItemsError?.message);
   }
 
   const projectBudgetTotals = new Map<string, number>();
@@ -73,6 +80,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const metricBudgetItems = projectType === "Todos" ? (budgetItems ?? []) : (budgetItems ?? []).filter((item) => metricProjectIds.has(item.project_id));
   const lastReadByProject = new Map((projectReads ?? []).map((read) => [read.project_id, new Date(read.last_read_at).getTime()]));
   const unreadByProject = new Map<string, number>();
+  const dismissedKeys = new Set((dismissedItems ?? []).map((item) => String(item.item_key)));
 
   for (const message of messages ?? []) {
     if (message.user_id === user.id) {
@@ -84,6 +92,22 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       unreadByProject.set(message.project_id, (unreadByProject.get(message.project_id) ?? 0) + 1);
     }
   }
+  const totalUnread = Array.from(unreadByProject.values()).reduce((sum, count) => sum + count, 0);
+  const projectsWithUnread = Array.from(unreadByProject.values()).filter((count) => count > 0).length;
+  const pendingProjects = metricProjects.filter((project) => project.status === "Pendiente");
+  const quotedProjects = metricProjects.filter((project) => project.status === "Presupuestado");
+  const quotedAmount = quotedProjects.reduce((sum, project) => sum + (projectBudgetTotals.get(project.id) ?? 0), 0);
+  const withoutBudget = metricProjects.filter((project) => (projectBudgetTotals.get(project.id) ?? 0) === 0);
+  const todayCards = buildTodayCards({
+    totalUnread,
+    projectsWithUnread,
+    pendingProjects: pendingProjects.length,
+    quotedProjects: quotedProjects.length,
+    quotedAmount,
+    withoutBudget: withoutBudget.length,
+    dismissedKeys,
+    projectType,
+  });
 
   return (
     <main className="min-h-screen pb-24">
@@ -101,6 +125,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </div>
 
         <DashboardStats projects={metricProjects} budgetItems={metricBudgetItems} />
+        <TodayPanel cards={todayCards} />
 
         <form className="mt-5 grid gap-3 rounded-lg border border-line bg-white p-3 shadow-soft md:grid-cols-[1fr_220px_auto]">
           <div className="flex flex-wrap gap-2 md:col-span-3">
@@ -143,6 +168,68 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       </div>
     </main>
   );
+}
+
+function buildTodayCards({
+  totalUnread,
+  projectsWithUnread,
+  pendingProjects,
+  quotedProjects,
+  quotedAmount,
+  withoutBudget,
+  dismissedKeys,
+  projectType,
+}: {
+  totalUnread: number;
+  projectsWithUnread: number;
+  pendingProjects: number;
+  quotedProjects: number;
+  quotedAmount: number;
+  withoutBudget: number;
+  dismissedKeys: Set<string>;
+  projectType: ProjectType | "Todos";
+}) {
+  const suffix = projectType === "Todos" ? "all" : projectType.toLowerCase();
+  const cards: TodayCard[] = [
+    totalUnread > 0
+      ? {
+          key: `unread-${suffix}`,
+          title: "Mensajes nuevos",
+          value: String(totalUnread),
+          detail: `${projectsWithUnread} obras con mensajes sin leer`,
+          tone: "red",
+        }
+      : null,
+    pendingProjects > 0
+      ? {
+          key: `pending-${suffix}`,
+          title: "Obras pendientes",
+          value: String(pendingProjects),
+          detail: "Conviene revisar si falta medir o llamar",
+          tone: "blue",
+        }
+      : null,
+    quotedProjects > 0
+      ? {
+          key: `quoted-${suffix}`,
+          title: "Por aprobar",
+          value: new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(quotedAmount),
+          detail: `${quotedProjects} presupuestos esperando respuesta`,
+          tone: "clay",
+        }
+      : null,
+    withoutBudget > 0
+      ? {
+          key: `without-budget-${suffix}`,
+          title: "Sin presupuesto",
+          value: String(withoutBudget),
+          detail: "Obras sin importe creado todavía",
+          tone: "moss",
+        }
+      : null,
+  ].filter((card): card is TodayCard => Boolean(card));
+
+  return cards.filter((card) => !dismissedKeys.has(card.key));
 }
 
 function ProjectTypeTab({
