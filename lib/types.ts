@@ -19,25 +19,6 @@ export type ProjectType = "Pintura" | "Laca";
 
 export const PROJECT_TYPES: ProjectType[] = ["Pintura", "Laca"];
 
-export type ProjectTag =
-  | "Normal"
-  | "Urgente"
-  | "Esperando cliente"
-  | "Falta medir"
-  | "Falta presupuesto"
-  | "Material pedido"
-  | "Listo para empezar";
-
-export const PROJECT_TAGS: ProjectTag[] = [
-  "Normal",
-  "Urgente",
-  "Esperando cliente",
-  "Falta medir",
-  "Falta presupuesto",
-  "Material pedido",
-  "Listo para empezar",
-];
-
 export type RoomPaintScope = "walls_and_ceiling" | "ceiling_only" | "walls_only" | "manual_area";
 
 export type Profile = {
@@ -58,11 +39,6 @@ export type Project = {
   description: string;
   status: ProjectStatus;
   project_type: ProjectType;
-  priority_tag: ProjectTag;
-  next_step: string | null;
-  visit_date: string | null;
-  start_date: string | null;
-  end_date: string | null;
   internal_notes: string | null;
   created_by: string | null;
   created_at: string;
@@ -84,17 +60,6 @@ export type ProjectRead = {
   project_id: string;
   user_id: string;
   last_read_at: string;
-  created_at: string;
-  updated_at: string;
-};
-
-export type ProjectTask = {
-  id: string;
-  project_id: string;
-  title: string;
-  is_done: boolean;
-  due_date: string | null;
-  created_by: string | null;
   created_at: string;
   updated_at: string;
 };

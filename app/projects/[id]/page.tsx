@@ -5,7 +5,7 @@ import { TopBar } from "@/components/TopBar";
 import { ProjectTabs } from "@/components/ProjectTabs";
 import { formatCurrency } from "@/lib/calculations";
 import { requireUserProfile } from "@/lib/auth";
-import type { BudgetItem, Message, Profile, Project, ProjectFile, ProjectTask, Room } from "@/lib/types";
+import type { BudgetItem, Message, Profile, Project, ProjectFile, Room } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -32,14 +32,12 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     { data: fileData },
     { data: roomData },
     { data: budgetData },
-    { data: taskData },
     { data: profileData },
   ] = await Promise.all([
     supabase.from("messages").select("*").eq("project_id", params.id).order("created_at", { ascending: true }).returns<Message[]>(),
     supabase.from("project_files").select("*").eq("project_id", params.id).order("created_at", { ascending: false }).returns<ProjectFile[]>(),
     supabase.from("rooms").select("*").eq("project_id", params.id).order("created_at", { ascending: false }).returns<Room[]>(),
     supabase.from("budget_items").select("*").eq("project_id", params.id).order("created_at", { ascending: true }).returns<BudgetItem[]>(),
-    supabase.from("project_tasks").select("*").eq("project_id", params.id).order("is_done", { ascending: true }).order("due_date", { ascending: true, nullsFirst: false }).order("created_at", { ascending: false }).returns<ProjectTask[]>(),
     supabase.from("profiles").select("*").returns<Profile[]>(),
   ]);
 
@@ -47,7 +45,6 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   const files = fileData ?? [];
   const rooms = roomData ?? [];
   const budgetItems = budgetData ?? [];
-  const tasks = taskData ?? [];
   const profiles = profileData ?? [];
   const profileMap = new Map(profiles.map((item) => [item.user_id, item.name]));
   const enrichedMessages = messages.map((message) => ({
@@ -96,7 +93,6 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           files={filesWithSignedUrls}
           rooms={rooms}
           budgetItems={budgetItems}
-          tasks={tasks}
         />
       </div>
     </main>

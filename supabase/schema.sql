@@ -42,11 +42,6 @@ create table if not exists public.projects (
   description text not null,
   status public.project_status not null default 'Pendiente',
   project_type text not null default 'Pintura' check (project_type in ('Pintura', 'Laca')),
-  priority_tag text not null default 'Normal' check (priority_tag in ('Normal', 'Urgente', 'Esperando cliente', 'Falta medir', 'Falta presupuesto', 'Material pedido', 'Listo para empezar')),
-  next_step text,
-  visit_date date,
-  start_date date,
-  end_date date,
   internal_notes text,
   created_by uuid references public.profiles(user_id) on delete set null,
   created_at timestamptz not null default now(),
@@ -70,17 +65,6 @@ create table if not exists public.project_reads (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (project_id, user_id)
-);
-
-create table if not exists public.project_tasks (
-  id uuid primary key default gen_random_uuid(),
-  project_id uuid not null references public.projects(id) on delete cascade,
-  title text not null,
-  is_done boolean not null default false,
-  due_date date,
-  created_by uuid references public.profiles(user_id) on delete set null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
 );
 
 create table if not exists public.project_files (
@@ -140,11 +124,6 @@ create trigger set_project_reads_updated_at
 before update on public.project_reads
 for each row execute function public.set_updated_at();
 
-drop trigger if exists set_project_tasks_updated_at on public.project_tasks;
-create trigger set_project_tasks_updated_at
-before update on public.project_tasks
-for each row execute function public.set_updated_at();
-
 create index if not exists profiles_user_id_idx on public.profiles(user_id);
 create index if not exists projects_created_at_idx on public.projects(created_at desc);
 create index if not exists projects_status_idx on public.projects(status);
@@ -152,7 +131,6 @@ create index if not exists projects_project_type_idx on public.projects(project_
 create index if not exists projects_last_activity_at_idx on public.projects(last_activity_at desc);
 create index if not exists messages_project_id_created_at_idx on public.messages(project_id, created_at);
 create index if not exists project_reads_user_project_idx on public.project_reads(user_id, project_id);
-create index if not exists project_tasks_project_done_idx on public.project_tasks(project_id, is_done, due_date);
 create index if not exists project_files_project_id_created_at_idx on public.project_files(project_id, created_at desc);
 create index if not exists rooms_project_id_created_at_idx on public.rooms(project_id, created_at desc);
 create index if not exists budget_items_project_id_created_at_idx on public.budget_items(project_id, created_at);
@@ -161,7 +139,6 @@ alter table public.profiles enable row level security;
 alter table public.projects enable row level security;
 alter table public.messages enable row level security;
 alter table public.project_reads enable row level security;
-alter table public.project_tasks enable row level security;
 alter table public.project_files enable row level security;
 alter table public.rooms enable row level security;
 alter table public.budget_items enable row level security;
@@ -225,13 +202,6 @@ on public.project_reads for update
 to authenticated
 using (public.is_decoralia_user() and user_id = auth.uid())
 with check (public.is_decoralia_user() and user_id = auth.uid());
-
-drop policy if exists "project_tasks_all_authorized" on public.project_tasks;
-create policy "project_tasks_all_authorized"
-on public.project_tasks for all
-to authenticated
-using (public.is_decoralia_user())
-with check (public.is_decoralia_user());
 
 drop policy if exists "project_files_all_authorized" on public.project_files;
 create policy "project_files_all_authorized"
