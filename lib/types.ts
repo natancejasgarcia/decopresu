@@ -64,6 +64,17 @@ export type ProjectRead = {
   updated_at: string;
 };
 
+export type DailyNote = {
+  id: string;
+  text: string;
+  note_date: string;
+  created_by: string;
+  is_done: boolean;
+  created_at: string;
+  updated_at: string;
+  author_name?: string;
+};
+
 export type ProjectFile = {
   id: string;
   project_id: string;

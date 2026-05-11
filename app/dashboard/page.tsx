@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 import { DashboardStats } from "@/components/DashboardStats";
+import { DailyNotesPanel } from "@/components/DailyNotesPanel";
 import { TopBar } from "@/components/TopBar";
 import { ProjectCard } from "@/components/ProjectCard";
 import { TodayPanel, type TodayCard } from "@/components/TodayPanel";
 import { requireUserProfile } from "@/lib/auth";
-import { PROJECT_STATUSES, PROJECT_TYPES, type Message, type Project, type ProjectRead, type ProjectStatus, type ProjectType } from "@/lib/types";
+import { PROJECT_STATUSES, PROJECT_TYPES, type DailyNote, type Message, type Profile, type Project, type ProjectRead, type ProjectStatus, type ProjectType } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     { data: messages, error: messagesError },
     { data: projectReads, error: projectReadsError },
     { data: dismissedItems, error: dismissedItemsError },
+    { data: dailyNotes, error: dailyNotesError },
+    { data: profiles, error: profilesError },
   ] = await Promise.all([
     query.returns<Project[]>(),
     supabase.from("projects").select("*").order("created_at", { ascending: false }).returns<Project[]>(),
@@ -65,10 +68,29 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       .select("item_key")
       .eq("user_id", user.id)
       .eq("dismissed_on", new Date().toISOString().slice(0, 10)),
+    supabase
+      .from("daily_notes")
+      .select("*")
+      .eq("note_date", new Date().toISOString().slice(0, 10))
+      .order("is_done", { ascending: true })
+      .order("created_at", { ascending: false })
+      .returns<DailyNote[]>(),
+    supabase.from("profiles").select("*").returns<Profile[]>(),
   ]);
 
-  if (error || allProjectsError || budgetItemsError || messagesError || projectReadsError || dismissedItemsError) {
-    throw new Error(error?.message ?? allProjectsError?.message ?? budgetItemsError?.message ?? messagesError?.message ?? projectReadsError?.message ?? dismissedItemsError?.message);
+  const dailyNotesTableMissing = dailyNotesError?.code === "42P01";
+
+  if (error || allProjectsError || budgetItemsError || messagesError || projectReadsError || dismissedItemsError || (dailyNotesError && !dailyNotesTableMissing) || profilesError) {
+    throw new Error(
+      error?.message
+        ?? allProjectsError?.message
+        ?? budgetItemsError?.message
+        ?? messagesError?.message
+        ?? projectReadsError?.message
+        ?? dismissedItemsError?.message
+        ?? dailyNotesError?.message
+        ?? profilesError?.message,
+    );
   }
 
   const projectBudgetTotals = new Map<string, number>();
@@ -93,6 +115,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     }
   }
   const totalUnread = Array.from(unreadByProject.values()).reduce((sum, count) => sum + count, 0);
+  const profileNames = new Map((profiles ?? []).map((item) => [item.user_id, item.name]));
+  const enrichedDailyNotes = (dailyNotesTableMissing ? [] : (dailyNotes ?? [])).map((note) => ({
+    ...note,
+    author_name: profileNames.get(note.created_by) ?? "Decoralia",
+  }));
   const projectsWithUnread = Array.from(unreadByProject.values()).filter((count) => count > 0).length;
   const pendingProjects = metricProjects.filter((project) => project.status === "Pendiente");
   const quotedProjects = metricProjects.filter((project) => project.status === "Presupuestado");
@@ -126,6 +153,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
         <DashboardStats projects={metricProjects} budgetItems={metricBudgetItems} />
         <TodayPanel cards={todayCards} />
+        <DailyNotesPanel notes={enrichedDailyNotes} />
 
         <form className="mt-5 grid gap-3 rounded-lg border border-line bg-white p-3 shadow-soft md:grid-cols-[1fr_220px_auto]">
           <div className="flex flex-wrap gap-2 md:col-span-3">

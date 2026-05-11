@@ -76,6 +76,16 @@ create table if not exists public.dashboard_dismissals (
   unique (user_id, item_key, dismissed_on)
 );
 
+create table if not exists public.daily_notes (
+  id uuid primary key default gen_random_uuid(),
+  text text not null,
+  note_date date not null default current_date,
+  created_by uuid not null references public.profiles(user_id) on delete cascade,
+  is_done boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.project_files (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.projects(id) on delete cascade,
@@ -133,6 +143,11 @@ create trigger set_project_reads_updated_at
 before update on public.project_reads
 for each row execute function public.set_updated_at();
 
+drop trigger if exists set_daily_notes_updated_at on public.daily_notes;
+create trigger set_daily_notes_updated_at
+before update on public.daily_notes
+for each row execute function public.set_updated_at();
+
 create index if not exists profiles_user_id_idx on public.profiles(user_id);
 create index if not exists projects_created_at_idx on public.projects(created_at desc);
 create index if not exists projects_status_idx on public.projects(status);
@@ -141,6 +156,7 @@ create index if not exists projects_last_activity_at_idx on public.projects(last
 create index if not exists messages_project_id_created_at_idx on public.messages(project_id, created_at);
 create index if not exists project_reads_user_project_idx on public.project_reads(user_id, project_id);
 create index if not exists dashboard_dismissals_user_day_idx on public.dashboard_dismissals(user_id, dismissed_on);
+create index if not exists daily_notes_date_done_idx on public.daily_notes(note_date desc, is_done, created_at desc);
 create index if not exists project_files_project_id_created_at_idx on public.project_files(project_id, created_at desc);
 create index if not exists rooms_project_id_created_at_idx on public.rooms(project_id, created_at desc);
 create index if not exists budget_items_project_id_created_at_idx on public.budget_items(project_id, created_at);
@@ -150,6 +166,7 @@ alter table public.projects enable row level security;
 alter table public.messages enable row level security;
 alter table public.project_reads enable row level security;
 alter table public.dashboard_dismissals enable row level security;
+alter table public.daily_notes enable row level security;
 alter table public.project_files enable row level security;
 alter table public.rooms enable row level security;
 alter table public.budget_items enable row level security;
@@ -225,6 +242,31 @@ create policy "dashboard_dismissals_insert_own"
 on public.dashboard_dismissals for insert
 to authenticated
 with check (public.is_decoralia_user() and user_id = auth.uid());
+
+drop policy if exists "daily_notes_select_authorized" on public.daily_notes;
+create policy "daily_notes_select_authorized"
+on public.daily_notes for select
+to authenticated
+using (public.is_decoralia_user());
+
+drop policy if exists "daily_notes_insert_own" on public.daily_notes;
+create policy "daily_notes_insert_own"
+on public.daily_notes for insert
+to authenticated
+with check (public.is_decoralia_user() and created_by = auth.uid());
+
+drop policy if exists "daily_notes_update_authorized" on public.daily_notes;
+create policy "daily_notes_update_authorized"
+on public.daily_notes for update
+to authenticated
+using (public.is_decoralia_user())
+with check (public.is_decoralia_user());
+
+drop policy if exists "daily_notes_delete_authorized" on public.daily_notes;
+create policy "daily_notes_delete_authorized"
+on public.daily_notes for delete
+to authenticated
+using (public.is_decoralia_user());
 
 drop policy if exists "project_files_all_authorized" on public.project_files;
 create policy "project_files_all_authorized"
