@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState, useTransition } from "react";
 import { Send } from "lucide-react";
-import { sendMessageAction } from "@/actions/messageActions";
+import { markProjectReadAction, sendMessageAction } from "@/actions/messageActions";
 import { formatDate } from "@/lib/calculations";
 import { createBrowserSupabaseClient } from "@/lib/supabaseClient";
 import type { Message } from "@/lib/types";
@@ -60,6 +60,12 @@ export function ProjectChat({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length]);
+
+  useEffect(() => {
+    const formData = new FormData();
+    formData.set("project_id", projectId);
+    void markProjectReadAction(formData);
+  }, [messages.length, projectId]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

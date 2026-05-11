@@ -7,6 +7,7 @@ import type { Project, ProjectStatus } from "@/lib/types";
 type ProjectCardProps = {
   project: Project;
   budgetTotal?: number;
+  unreadCount?: number;
 };
 
 const STATUS_STYLES: Record<ProjectStatus, { badge: string; border: string; wash: string }> = {
@@ -42,7 +43,7 @@ const STATUS_STYLES: Record<ProjectStatus, { badge: string; border: string; wash
   },
 };
 
-export function ProjectCard({ project, budgetTotal = 0 }: ProjectCardProps) {
+export function ProjectCard({ project, budgetTotal = 0, unreadCount = 0 }: ProjectCardProps) {
   const statusStyle = STATUS_STYLES[project.status];
 
   return (
@@ -78,7 +79,14 @@ export function ProjectCard({ project, budgetTotal = 0 }: ProjectCardProps) {
           </span>
         </div>
       </Link>
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex items-center justify-between gap-3">
+        {unreadCount > 0 ? (
+          <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-red-600 px-2 text-sm font-black text-white shadow-soft">
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        ) : (
+          <span />
+        )}
         <DeleteProjectButton projectId={project.id} projectName={project.name} />
       </div>
     </article>

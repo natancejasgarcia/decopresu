@@ -57,6 +57,16 @@ create table if not exists public.messages (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.project_reads (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references public.projects(id) on delete cascade,
+  user_id uuid not null references public.profiles(user_id) on delete cascade,
+  last_read_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (project_id, user_id)
+);
+
 create table if not exists public.project_files (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.projects(id) on delete cascade,
@@ -109,12 +119,18 @@ create trigger set_projects_updated_at
 before update on public.projects
 for each row execute function public.set_updated_at();
 
+drop trigger if exists set_project_reads_updated_at on public.project_reads;
+create trigger set_project_reads_updated_at
+before update on public.project_reads
+for each row execute function public.set_updated_at();
+
 create index if not exists profiles_user_id_idx on public.profiles(user_id);
 create index if not exists projects_created_at_idx on public.projects(created_at desc);
 create index if not exists projects_status_idx on public.projects(status);
 create index if not exists projects_project_type_idx on public.projects(project_type);
 create index if not exists projects_last_activity_at_idx on public.projects(last_activity_at desc);
 create index if not exists messages_project_id_created_at_idx on public.messages(project_id, created_at);
+create index if not exists project_reads_user_project_idx on public.project_reads(user_id, project_id);
 create index if not exists project_files_project_id_created_at_idx on public.project_files(project_id, created_at desc);
 create index if not exists rooms_project_id_created_at_idx on public.rooms(project_id, created_at desc);
 create index if not exists budget_items_project_id_created_at_idx on public.budget_items(project_id, created_at);
@@ -122,6 +138,7 @@ create index if not exists budget_items_project_id_created_at_idx on public.budg
 alter table public.profiles enable row level security;
 alter table public.projects enable row level security;
 alter table public.messages enable row level security;
+alter table public.project_reads enable row level security;
 alter table public.project_files enable row level security;
 alter table public.rooms enable row level security;
 alter table public.budget_items enable row level security;
@@ -165,6 +182,25 @@ create policy "messages_all_authorized"
 on public.messages for all
 to authenticated
 using (public.is_decoralia_user())
+with check (public.is_decoralia_user() and user_id = auth.uid());
+
+drop policy if exists "project_reads_select_authorized" on public.project_reads;
+create policy "project_reads_select_authorized"
+on public.project_reads for select
+to authenticated
+using (public.is_decoralia_user());
+
+drop policy if exists "project_reads_insert_own" on public.project_reads;
+create policy "project_reads_insert_own"
+on public.project_reads for insert
+to authenticated
+with check (public.is_decoralia_user() and user_id = auth.uid());
+
+drop policy if exists "project_reads_update_own" on public.project_reads;
+create policy "project_reads_update_own"
+on public.project_reads for update
+to authenticated
+using (public.is_decoralia_user() and user_id = auth.uid())
 with check (public.is_decoralia_user() and user_id = auth.uid());
 
 drop policy if exists "project_files_all_authorized" on public.project_files;

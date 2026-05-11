@@ -55,6 +55,15 @@ export type Message = {
   user_name?: string;
 };
 
+export type ProjectRead = {
+  id: string;
+  project_id: string;
+  user_id: string;
+  last_read_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ProjectFile = {
   id: string;
   project_id: string;

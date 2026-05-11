@@ -4,7 +4,7 @@ import { DashboardStats } from "@/components/DashboardStats";
 import { TopBar } from "@/components/TopBar";
 import { ProjectCard } from "@/components/ProjectCard";
 import { requireUserProfile } from "@/lib/auth";
-import { PROJECT_STATUSES, PROJECT_TYPES, type Project, type ProjectStatus, type ProjectType } from "@/lib/types";
+import { PROJECT_STATUSES, PROJECT_TYPES, type Message, type Project, type ProjectRead, type ProjectStatus, type ProjectType } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,7 @@ type DashboardBudgetItem = {
 };
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-  const { supabase, profile } = await requireUserProfile();
+  const { supabase, profile, user } = await requireUserProfile();
   const q = searchParams.q?.trim() ?? "";
   const status = searchParams.status ?? "Todos";
   const projectType: ProjectType | "Todos" = PROJECT_TYPES.includes(searchParams.type as ProjectType) ? (searchParams.type as ProjectType) : "Todos";
@@ -50,14 +50,18 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     { data: projects, error },
     { data: allProjects, error: allProjectsError },
     { data: budgetItems, error: budgetItemsError },
+    { data: messages, error: messagesError },
+    { data: projectReads, error: projectReadsError },
   ] = await Promise.all([
     query.returns<Project[]>(),
     supabase.from("projects").select("*").order("created_at", { ascending: false }).returns<Project[]>(),
     supabase.from("budget_items").select("project_id,total,created_at").returns<DashboardBudgetItem[]>(),
+    supabase.from("messages").select("id,project_id,user_id,text,created_at").returns<Message[]>(),
+    supabase.from("project_reads").select("*").eq("user_id", user.id).returns<ProjectRead[]>(),
   ]);
 
-  if (error || allProjectsError || budgetItemsError) {
-    throw new Error(error?.message ?? allProjectsError?.message ?? budgetItemsError?.message);
+  if (error || allProjectsError || budgetItemsError || messagesError || projectReadsError) {
+    throw new Error(error?.message ?? allProjectsError?.message ?? budgetItemsError?.message ?? messagesError?.message ?? projectReadsError?.message);
   }
 
   const projectBudgetTotals = new Map<string, number>();
@@ -67,6 +71,19 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const metricProjects = projectType === "Todos" ? (allProjects ?? []) : (allProjects ?? []).filter((project) => project.project_type === projectType);
   const metricProjectIds = new Set(metricProjects.map((project) => project.id));
   const metricBudgetItems = projectType === "Todos" ? (budgetItems ?? []) : (budgetItems ?? []).filter((item) => metricProjectIds.has(item.project_id));
+  const lastReadByProject = new Map((projectReads ?? []).map((read) => [read.project_id, new Date(read.last_read_at).getTime()]));
+  const unreadByProject = new Map<string, number>();
+
+  for (const message of messages ?? []) {
+    if (message.user_id === user.id) {
+      continue;
+    }
+
+    const lastReadAt = lastReadByProject.get(message.project_id) ?? 0;
+    if (new Date(message.created_at).getTime() > lastReadAt) {
+      unreadByProject.set(message.project_id, (unreadByProject.get(message.project_id) ?? 0) + 1);
+    }
+  }
 
   return (
     <main className="min-h-screen pb-24">
@@ -108,7 +125,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
         <section className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {projects?.length ? (
-            projects.map((project) => <ProjectCard key={project.id} project={project} budgetTotal={projectBudgetTotals.get(project.id) ?? 0} />)
+            projects.map((project) => (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                budgetTotal={projectBudgetTotals.get(project.id) ?? 0}
+                unreadCount={unreadByProject.get(project.id) ?? 0}
+              />
+            ))
           ) : (
             <div className="col-span-full rounded-lg border border-dashed border-line bg-white p-8 text-center">
               <h2 className="text-xl font-black text-ink">No hay proyectos todavia</h2>
