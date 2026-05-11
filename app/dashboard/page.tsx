@@ -123,18 +123,38 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <button className="h-12 rounded-lg border border-line px-5 font-black text-ink">Filtrar</button>
         </form>
 
-        <section className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <section className="mt-5">
           {projects?.length ? (
-            projects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                budgetTotal={projectBudgetTotals.get(project.id) ?? 0}
-                unreadCount={unreadByProject.get(project.id) ?? 0}
-              />
-            ))
+            <div className="flex gap-3 overflow-x-auto pb-3">
+              {(status === "Todos" ? PROJECT_STATUSES : [status]).map((columnStatus) => {
+                const columnProjects = projects.filter((project) => project.status === columnStatus);
+
+                return (
+                  <div key={columnStatus} className="min-w-[300px] flex-1 rounded-lg border border-line bg-white/70 p-3 shadow-soft">
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <h2 className="text-sm font-black text-ink">{columnStatus}</h2>
+                      <span className="rounded-full bg-paper px-2 py-1 text-xs font-black text-muted">{columnProjects.length}</span>
+                    </div>
+                    <div className="grid gap-3">
+                      {columnProjects.length ? (
+                        columnProjects.map((project) => (
+                          <ProjectCard
+                            key={project.id}
+                            project={project}
+                            budgetTotal={projectBudgetTotals.get(project.id) ?? 0}
+                            unreadCount={unreadByProject.get(project.id) ?? 0}
+                          />
+                        ))
+                      ) : (
+                        <p className="rounded-lg border border-dashed border-line bg-paper p-3 text-sm font-semibold text-muted">Sin obras</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
-            <div className="col-span-full rounded-lg border border-dashed border-line bg-white p-8 text-center">
+            <div className="rounded-lg border border-dashed border-line bg-white p-8 text-center">
               <h2 className="text-xl font-black text-ink">No hay proyectos todavia</h2>
               <p className="mt-2 text-sm text-muted">Crea el primero para empezar a centralizar chats, fotos y presupuestos.</p>
             </div>

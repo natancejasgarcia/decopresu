@@ -58,19 +58,34 @@ export function ProjectCard({ project, budgetTotal = 0, unreadCount = 0 }: Proje
             <span className={`rounded-full px-3 py-1 text-xs font-black ${statusStyle.badge}`}>
               {project.status}
             </span>
-            <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-black text-moss ring-1 ring-line">
-              {project.project_type ?? "Pintura"}
-            </span>
-          </div>
+          <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-black text-moss ring-1 ring-line">
+            {project.project_type ?? "Pintura"}
+          </span>
+          <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-black text-clay ring-1 ring-line">
+            {project.priority_tag ?? "Normal"}
+          </span>
         </div>
+      </div>
         <p className="mt-3 inline-flex items-center gap-2 rounded-lg bg-white/75 px-3 py-2 text-sm font-black text-ink ring-1 ring-line">
           <Euro size={15} className="text-moss" />
           {formatCurrency(budgetTotal)}
         </p>
-        <p className="mt-3 flex items-center gap-2 text-sm text-muted">
-          <MapPin size={16} />
-          {project.address}
+      <p className="mt-3 flex items-center gap-2 text-sm text-muted">
+        <MapPin size={16} />
+        {project.address}
+      </p>
+      {project.next_step ? (
+        <p className="mt-3 rounded-lg bg-white/70 p-2 text-sm font-black text-ink ring-1 ring-line">
+          {project.next_step}
         </p>
+      ) : null}
+      {(project.visit_date || project.start_date) ? (
+        <p className="mt-2 text-xs font-bold text-muted">
+          {project.visit_date ? `Visita ${formatCardDate(project.visit_date)}` : ""}
+          {project.visit_date && project.start_date ? " · " : ""}
+          {project.start_date ? `Inicio ${formatCardDate(project.start_date)}` : ""}
+        </p>
+      ) : null}
         <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted">
           <span>Creado: {formatDate(project.created_at)}</span>
           <span className="flex items-center justify-end gap-1">
@@ -91,4 +106,8 @@ export function ProjectCard({ project, budgetTotal = 0, unreadCount = 0 }: Proje
       </div>
     </article>
   );
+}
+
+function formatCardDate(value: string) {
+  return new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short" }).format(new Date(value));
 }

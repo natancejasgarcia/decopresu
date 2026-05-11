@@ -1,5 +1,5 @@
 import { updateProjectAction } from "@/actions/projectActions";
-import { PROJECT_STATUSES, PROJECT_TYPES, type Project } from "@/lib/types";
+import { PROJECT_STATUSES, PROJECT_TAGS, PROJECT_TYPES, type Project } from "@/lib/types";
 
 type ProjectEditFormProps = {
   project: Project;
@@ -13,13 +13,23 @@ export function ProjectEditForm({ project }: ProjectEditFormProps) {
         <label className="form-label" htmlFor="edit-name">Nombre del proyecto</label>
         <input className="form-input" id="edit-name" name="name" required defaultValue={project.name} />
       </div>
-      <div>
-        <label className="form-label" htmlFor="edit-project-type">Tipo de obra</label>
-        <select className="form-input" id="edit-project-type" name="project_type" defaultValue={project.project_type ?? "Pintura"}>
-          {PROJECT_TYPES.map((type) => (
-            <option key={type} value={type}>{type}</option>
-          ))}
-        </select>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="form-label" htmlFor="edit-project-type">Tipo de obra</label>
+          <select className="form-input" id="edit-project-type" name="project_type" defaultValue={project.project_type ?? "Pintura"}>
+            {PROJECT_TYPES.map((type) => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="form-label" htmlFor="edit-priority-tag">Etiqueta</label>
+          <select className="form-input" id="edit-priority-tag" name="priority_tag" defaultValue={project.priority_tag ?? "Normal"}>
+            {PROJECT_TAGS.map((tag) => (
+              <option key={tag} value={tag}>{tag}</option>
+            ))}
+          </select>
+        </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
@@ -48,6 +58,24 @@ export function ProjectEditForm({ project }: ProjectEditFormProps) {
       <div>
         <label className="form-label" htmlFor="edit-address">Direccion</label>
         <input className="form-input" id="edit-address" name="address" required defaultValue={project.address} />
+      </div>
+      <div>
+        <label className="form-label" htmlFor="edit-next-step">Proximo paso</label>
+        <input className="form-input" id="edit-next-step" name="next_step" defaultValue={project.next_step ?? ""} />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div>
+          <label className="form-label" htmlFor="edit-visit-date">Visita</label>
+          <input className="form-input" id="edit-visit-date" name="visit_date" type="date" defaultValue={project.visit_date ?? ""} />
+        </div>
+        <div>
+          <label className="form-label" htmlFor="edit-start-date">Inicio</label>
+          <input className="form-input" id="edit-start-date" name="start_date" type="date" defaultValue={project.start_date ?? ""} />
+        </div>
+        <div>
+          <label className="form-label" htmlFor="edit-end-date">Fin previsto</label>
+          <input className="form-input" id="edit-end-date" name="end_date" type="date" defaultValue={project.end_date ?? ""} />
+        </div>
       </div>
       <div>
         <label className="form-label" htmlFor="edit-description">Descripcion del trabajo</label>

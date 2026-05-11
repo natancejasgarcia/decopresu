@@ -1,5 +1,5 @@
 import { createProjectAction } from "@/actions/projectActions";
-import { PROJECT_STATUSES, PROJECT_TYPES } from "@/lib/types";
+import { PROJECT_STATUSES, PROJECT_TAGS, PROJECT_TYPES } from "@/lib/types";
 
 export function ProjectForm() {
   return (
@@ -8,13 +8,23 @@ export function ProjectForm() {
         <label className="form-label" htmlFor="name">Nombre del proyecto</label>
         <input className="form-input" id="name" name="name" required placeholder="Piso Gran Via" />
       </div>
-      <div>
-        <label className="form-label" htmlFor="project_type">Tipo de obra</label>
-        <select className="form-input" id="project_type" name="project_type" defaultValue="Pintura">
-          {PROJECT_TYPES.map((type) => (
-            <option key={type} value={type}>{type}</option>
-          ))}
-        </select>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="form-label" htmlFor="project_type">Tipo de obra</label>
+          <select className="form-input" id="project_type" name="project_type" defaultValue="Pintura">
+            {PROJECT_TYPES.map((type) => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="form-label" htmlFor="priority_tag">Etiqueta</label>
+          <select className="form-input" id="priority_tag" name="priority_tag" defaultValue="Normal">
+            {PROJECT_TAGS.map((tag) => (
+              <option key={tag} value={tag}>{tag}</option>
+            ))}
+          </select>
+        </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
@@ -43,6 +53,24 @@ export function ProjectForm() {
       <div>
         <label className="form-label" htmlFor="address">Direccion</label>
         <input className="form-input" id="address" name="address" required placeholder="Calle, numero, poblacion" />
+      </div>
+      <div>
+        <label className="form-label" htmlFor="next_step">Proximo paso</label>
+        <input className="form-input" id="next_step" name="next_step" placeholder="Medir, enviar presupuesto, llamar cliente..." />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div>
+          <label className="form-label" htmlFor="visit_date">Visita</label>
+          <input className="form-input" id="visit_date" name="visit_date" type="date" />
+        </div>
+        <div>
+          <label className="form-label" htmlFor="start_date">Inicio</label>
+          <input className="form-input" id="start_date" name="start_date" type="date" />
+        </div>
+        <div>
+          <label className="form-label" htmlFor="end_date">Fin previsto</label>
+          <input className="form-input" id="end_date" name="end_date" type="date" />
+        </div>
       </div>
       <div>
         <label className="form-label" htmlFor="description">Descripcion del trabajo</label>
