@@ -113,5 +113,6 @@ export type BudgetItem = {
   unit: string;
   unit_price: number;
   total: number;
+  sort_order: number;
   created_at: string;
 };

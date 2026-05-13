@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse, type NextRequest } from "next/server";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { sortBudgetItems } from "@/lib/budget";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import type { BudgetItem, Project, Room } from "@/lib/types";
 
@@ -179,7 +180,7 @@ export async function GET(_request: NextRequest, { params }: Context) {
     supabase.from("rooms").select("*").eq("project_id", params.id).order("created_at", { ascending: true }).returns<Room[]>(),
   ]);
 
-  const items = itemsData ?? [];
+  const items = sortBudgetItems(itemsData ?? []);
   const rooms = roomsData ?? [];
   const taxableBase = items.reduce((sum, item) => sum + Number(item.total), 0);
   const vat = taxableBase * VAT_RATE;

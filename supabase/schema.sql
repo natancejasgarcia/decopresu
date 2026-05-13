@@ -130,6 +130,7 @@ create table if not exists public.budget_items (
   unit text not null,
   unit_price numeric(10, 2) not null default 0 check (unit_price >= 0),
   total numeric(10, 2) generated always as (round(quantity * unit_price, 2)) stored,
+  sort_order integer not null default 0 check (sort_order >= 0),
   created_at timestamptz not null default now()
 );
 
@@ -160,6 +161,7 @@ create index if not exists daily_notes_date_done_idx on public.daily_notes(note_
 create index if not exists project_files_project_id_created_at_idx on public.project_files(project_id, created_at desc);
 create index if not exists rooms_project_id_created_at_idx on public.rooms(project_id, created_at desc);
 create index if not exists budget_items_project_id_created_at_idx on public.budget_items(project_id, created_at);
+create index if not exists budget_items_project_sort_order_idx on public.budget_items(project_id, sort_order, created_at);
 
 alter table public.profiles enable row level security;
 alter table public.projects enable row level security;

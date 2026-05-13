@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { PrintButton } from "@/components/PrintButton";
+import { sortBudgetItems } from "@/lib/budget";
 import { formatCurrency } from "@/lib/calculations";
 import { requireUserProfile } from "@/lib/auth";
 import type { BudgetItem, Project } from "@/lib/types";
@@ -54,7 +55,7 @@ export default async function PrintBudgetPage({ params }: PrintBudgetPageProps) 
     .order("created_at", { ascending: true })
     .returns<BudgetItem[]>();
 
-  const items = budgetData ?? [];
+  const items = sortBudgetItems(budgetData ?? []);
   const taxableBase = items.reduce((sum, item) => sum + Number(item.total), 0);
   const vat = taxableBase * VAT_RATE;
   const total = taxableBase + vat;

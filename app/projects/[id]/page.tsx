@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { ProjectTabs } from "@/components/ProjectTabs";
+import { sortBudgetItems } from "@/lib/budget";
 import { formatCurrency } from "@/lib/calculations";
 import { requireUserProfile } from "@/lib/auth";
 import type { BudgetItem, Message, Profile, Project, ProjectFile, Room } from "@/lib/types";
@@ -44,7 +45,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   const messages = messageData ?? [];
   const files = fileData ?? [];
   const rooms = roomData ?? [];
-  const budgetItems = budgetData ?? [];
+  const budgetItems = sortBudgetItems(budgetData ?? []);
   const profiles = profileData ?? [];
   const profileMap = new Map(profiles.map((item) => [item.user_id, item.name]));
   const enrichedMessages = messages.map((message) => ({
