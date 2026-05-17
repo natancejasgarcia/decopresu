@@ -116,3 +116,65 @@ export type BudgetItem = {
   sort_order: number;
   created_at: string;
 };
+
+export type ExpenseCategory =
+  | "Materiales"
+  | "Mano de obra"
+  | "Gasolina"
+  | "Herramientas"
+  | "Subcontrata"
+  | "Otros";
+
+export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
+  "Materiales",
+  "Mano de obra",
+  "Gasolina",
+  "Herramientas",
+  "Subcontrata",
+  "Otros",
+];
+
+export type PaymentMethod = "Transferencia" | "Efectivo" | "Bizum" | "Tarjeta" | "Otro";
+
+export const PAYMENT_METHODS: PaymentMethod[] = ["Transferencia", "Efectivo", "Bizum", "Tarjeta", "Otro"];
+
+export type FixedCostFrequency = "Mensual" | "Trimestral" | "Anual";
+
+export const FIXED_COST_FREQUENCIES: FixedCostFrequency[] = ["Mensual", "Trimestral", "Anual"];
+
+export type ProjectExpense = {
+  id: string;
+  project_id: string | null;
+  category: ExpenseCategory;
+  supplier: string | null;
+  concept: string;
+  amount: number;
+  expense_date: string;
+  is_paid: boolean;
+  notes: string | null;
+  created_by: string;
+  created_at: string;
+};
+
+export type ProjectPayment = {
+  id: string;
+  project_id: string;
+  amount: number;
+  payment_date: string;
+  method: PaymentMethod;
+  notes: string | null;
+  created_by: string;
+  created_at: string;
+};
+
+export type FixedCost = {
+  id: string;
+  name: string;
+  amount: number;
+  frequency: FixedCostFrequency;
+  next_payment_date: string | null;
+  is_active: boolean;
+  notes: string | null;
+  created_by: string;
+  created_at: string;
+};

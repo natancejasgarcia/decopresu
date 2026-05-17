@@ -6,9 +6,10 @@ import { ClientCard } from "@/components/ClientCard";
 import { FileUploader } from "@/components/FileUploader";
 import { ProjectChat } from "@/components/ProjectChat";
 import { ProjectEditForm } from "@/components/ProjectEditForm";
+import { ProjectFinancePanel } from "@/components/ProjectFinancePanel";
 import { RoomCalculator } from "@/components/RoomCalculator";
 import { formatCurrency } from "@/lib/calculations";
-import type { BudgetItem, Message, Profile, Project, ProjectFile, Room } from "@/lib/types";
+import type { BudgetItem, Message, Profile, Project, ProjectExpense, ProjectFile, ProjectPayment, Room } from "@/lib/types";
 
 type ProjectTabsProps = {
   project: Project;
@@ -17,9 +18,11 @@ type ProjectTabsProps = {
   files: ProjectFile[];
   rooms: Room[];
   budgetItems: BudgetItem[];
+  expenses: ProjectExpense[];
+  payments: ProjectPayment[];
 };
 
-const TABS = ["Resumen", "Chat", "Archivos", "Cliente", "Medidas", "Presupuesto"] as const;
+const TABS = ["Resumen", "Chat", "Archivos", "Cliente", "Medidas", "Presupuesto", "Gastos"] as const;
 type Tab = (typeof TABS)[number];
 
 export function ProjectTabs({
@@ -29,6 +32,8 @@ export function ProjectTabs({
   files,
   rooms,
   budgetItems,
+  expenses,
+  payments,
 }: ProjectTabsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("Resumen");
   const [isEditingProject, setIsEditingProject] = useState(false);
@@ -114,6 +119,7 @@ export function ProjectTabs({
         {activeTab === "Cliente" ? <ClientCard project={project} /> : null}
         {activeTab === "Medidas" ? <RoomCalculator projectId={project.id} rooms={rooms} /> : null}
         {activeTab === "Presupuesto" ? <BudgetBuilder projectId={project.id} items={budgetItems} rooms={rooms} /> : null}
+        {activeTab === "Gastos" ? <ProjectFinancePanel projectId={project.id} budgetTotal={budgetTotal} expenses={expenses} payments={payments} /> : null}
       </div>
     </div>
   );

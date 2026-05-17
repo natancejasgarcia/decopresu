@@ -6,7 +6,7 @@ import { ProjectTabs } from "@/components/ProjectTabs";
 import { sortBudgetItems } from "@/lib/budget";
 import { formatCurrency } from "@/lib/calculations";
 import { requireUserProfile } from "@/lib/auth";
-import type { BudgetItem, Message, Profile, Project, ProjectFile, Room } from "@/lib/types";
+import type { BudgetItem, Message, Profile, Project, ProjectExpense, ProjectFile, ProjectPayment, Room } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -34,18 +34,24 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     { data: roomData },
     { data: budgetData },
     { data: profileData },
+    { data: expenseData, error: expenseError },
+    { data: paymentData, error: paymentError },
   ] = await Promise.all([
     supabase.from("messages").select("*").eq("project_id", params.id).order("created_at", { ascending: true }).returns<Message[]>(),
     supabase.from("project_files").select("*").eq("project_id", params.id).order("created_at", { ascending: false }).returns<ProjectFile[]>(),
     supabase.from("rooms").select("*").eq("project_id", params.id).order("created_at", { ascending: false }).returns<Room[]>(),
     supabase.from("budget_items").select("*").eq("project_id", params.id).order("created_at", { ascending: true }).returns<BudgetItem[]>(),
     supabase.from("profiles").select("*").returns<Profile[]>(),
+    supabase.from("project_expenses").select("*").eq("project_id", params.id).order("expense_date", { ascending: false }).returns<ProjectExpense[]>(),
+    supabase.from("project_payments").select("*").eq("project_id", params.id).order("payment_date", { ascending: false }).returns<ProjectPayment[]>(),
   ]);
 
   const messages = messageData ?? [];
   const files = fileData ?? [];
   const rooms = roomData ?? [];
   const budgetItems = sortBudgetItems(budgetData ?? []);
+  const expenses = expenseError?.code === "42P01" ? [] : (expenseData ?? []);
+  const payments = paymentError?.code === "42P01" ? [] : (paymentData ?? []);
   const profiles = profileData ?? [];
   const profileMap = new Map(profiles.map((item) => [item.user_id, item.name]));
   const enrichedMessages = messages.map((message) => ({
@@ -94,6 +100,8 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           files={filesWithSignedUrls}
           rooms={rooms}
           budgetItems={budgetItems}
+          expenses={expenses}
+          payments={payments}
         />
       </div>
     </main>
