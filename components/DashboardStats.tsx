@@ -1,7 +1,9 @@
-import { CalendarDays, CheckCircle2, Euro, FileText, TrendingUp } from "lucide-react";
+import Link from "next/link";
+import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Euro, FileText, TrendingUp } from "lucide-react";
 import type { ReactNode } from "react";
 import { formatCurrency } from "@/lib/calculations";
-import { PROJECT_STATUSES, type Project, type ProjectStatus } from "@/lib/types";
+import { monthLabel } from "@/lib/finance";
+import { PROJECT_STATUSES, type Project, type ProjectStatus, type ProjectType } from "@/lib/types";
 
 type ProjectBudget = {
   project_id: string;
@@ -12,6 +14,12 @@ type ProjectBudget = {
 type DashboardStatsProps = {
   projects: Project[];
   budgetItems: ProjectBudget[];
+  monthKey: string;
+  year: number;
+  month: number;
+  q: string;
+  status: ProjectStatus | "Todos";
+  projectType: ProjectType | "Todos";
 };
 
 type ChartDay = {
@@ -30,11 +38,12 @@ const STATUS_TONES: Record<ProjectStatus, { badge: string; dot: string }> = {
   Cobrado: { badge: "bg-teal-50 text-teal-800", dot: "bg-teal-600" },
 };
 
-export function DashboardStats({ projects, budgetItems }: DashboardStatsProps) {
+export function DashboardStats({ projects, budgetItems, monthKey, year, month, q, status, projectType }: DashboardStatsProps) {
   const now = new Date();
   const todayKey = toDayKey(now);
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
+  const selectedMonthLabel = monthLabel(year, month);
   const totalsByProject = new Map<string, number>();
 
   for (const item of budgetItems) {
@@ -69,19 +78,26 @@ export function DashboardStats({ projects, budgetItems }: DashboardStatsProps) {
     .reduce((sum, project) => sum + (totalsByProject.get(project.id) ?? 0), 0);
 
   const statusRows = buildStatusRows(projects, totalsByProject);
-  const chartDays = buildChartDays(now, 14);
+  const chartDays = buildMonthDays(year, month);
   const budgetLine = chartDays.map((day) =>
     budgetItems
       .filter((item) => toDayKey(new Date(item.created_at)) === day.key)
       .reduce((sum, item) => sum + Number(item.total), 0),
   );
+  const approvedProjectsForSelectedMonth = projects.filter((project) => {
+    const createdAt = new Date(project.created_at);
+    return APPROVED_STATUSES.includes(project.status) && createdAt.getMonth() === month && createdAt.getFullYear() === year;
+  });
   const approvedLine = chartDays.map((day) =>
-    approvedThisMonthProjects
+    approvedProjectsForSelectedMonth
       .filter((project) => toDayKey(new Date(project.created_at)) === day.key)
       .reduce((sum, project) => sum + (totalsByProject.get(project.id) ?? 0), 0),
   );
   const chartMax = Math.max(...budgetLine, ...approvedLine, 1);
   const chartTotal = budgetLine.reduce((sum, value) => sum + value, 0);
+  const approvedChartTotal = approvedLine.reduce((sum, value) => sum + value, 0);
+  const previousMonthHref = buildDashboardMonthHref({ year, month: month - 1, q, status, projectType });
+  const nextMonthHref = buildDashboardMonthHref({ year, month: month + 1, q, status, projectType });
 
   return (
     <section className="mt-5 grid gap-3">
@@ -97,11 +113,30 @@ export function DashboardStats({ projects, budgetItems }: DashboardStatsProps) {
           <div>
             <p className="text-xs font-black uppercase text-clay">Grafica</p>
             <h2 className="text-xl font-black text-ink">Evolucion de presupuestos</h2>
-            <p className="mt-1 text-sm font-semibold text-muted">Ultimos 14 dias por importe creado y aprobado</p>
+            <p className="mt-1 text-sm font-semibold text-muted">Mes completo: {selectedMonthLabel}</p>
           </div>
-          <div className="flex items-center gap-2 rounded-lg bg-paper px-3 py-2 text-sm font-black text-moss">
-            <TrendingUp size={18} />
-            {formatCurrency(chartTotal)}
+          <div className="grid gap-2 sm:justify-items-end">
+            <div className="flex items-center gap-2 rounded-lg bg-paper px-3 py-2 text-sm font-black text-moss">
+              <TrendingUp size={18} />
+              {formatCurrency(chartTotal)}
+            </div>
+            <form className="flex gap-2">
+              {q ? <input type="hidden" name="q" value={q} /> : null}
+              {status !== "Todos" ? <input type="hidden" name="status" value={status} /> : null}
+              {projectType !== "Todos" ? <input type="hidden" name="type" value={projectType} /> : null}
+              <input className="h-10 rounded-lg border border-line bg-white px-3 text-sm font-black text-ink" name="month" type="month" defaultValue={monthKey} />
+              <button className="h-10 rounded-lg bg-moss px-4 text-sm font-black text-white">Ver</button>
+            </form>
+            <div className="flex gap-2">
+              <Link className="inline-flex h-9 items-center gap-1 rounded-lg border border-line bg-white px-3 text-sm font-black text-ink" href={previousMonthHref}>
+                <ChevronLeft size={16} />
+                Mes anterior
+              </Link>
+              <Link className="inline-flex h-9 items-center gap-1 rounded-lg border border-line bg-white px-3 text-sm font-black text-ink" href={nextMonthHref}>
+                Siguiente
+                <ChevronRight size={16} />
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -110,8 +145,8 @@ export function DashboardStats({ projects, budgetItems }: DashboardStatsProps) {
         </div>
 
         <div className="mt-4 flex flex-wrap gap-3">
-          <LegendItem color="bg-moss" label="Presupuestado" value={formatCurrency(budgetLine.at(-1) ?? 0)} />
-          <LegendItem color="bg-emerald-500" label="Aprobado" value={formatCurrency(approvedLine.at(-1) ?? 0)} />
+          <LegendItem color="bg-moss" label="Presupuestado en el mes" value={formatCurrency(chartTotal)} />
+          <LegendItem color="bg-emerald-500" label="Aprobado en el mes" value={formatCurrency(approvedChartTotal)} />
         </div>
 
         <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -262,16 +297,38 @@ function buildStatusRows(projects: Project[], totalsByProject: Map<string, numbe
   return Array.from(rows.values()).sort((a, b) => b.amount - a.amount);
 }
 
-function buildChartDays(endDate: Date, count: number): ChartDay[] {
-  return Array.from({ length: count }, (_, index) => {
-    const date = new Date(endDate);
-    date.setDate(endDate.getDate() - (count - 1 - index));
+function buildMonthDays(year: number, month: number): ChartDay[] {
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
 
+  return Array.from({ length: daysInMonth }, (_, index) => {
+    const date = new Date(year, month, index + 1);
     return {
       key: toDayKey(date),
       label: new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short" }).format(date).replace(".", ""),
     };
   });
+}
+
+function buildDashboardMonthHref({
+  year,
+  month,
+  q,
+  status,
+  projectType,
+}: {
+  year: number;
+  month: number;
+  q: string;
+  status: ProjectStatus | "Todos";
+  projectType: ProjectType | "Todos";
+}) {
+  const date = new Date(year, month, 1);
+  const params = new URLSearchParams();
+  params.set("month", `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`);
+  if (q) params.set("q", q);
+  if (status !== "Todos") params.set("status", status);
+  if (projectType !== "Todos") params.set("type", projectType);
+  return `/dashboard?${params.toString()}`;
 }
 
 function buildLinePoints(values: number[], maxValue: number, width: number, height: number, padding: { top: number; left: number }) {

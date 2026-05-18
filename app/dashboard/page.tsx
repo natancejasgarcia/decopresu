@@ -6,6 +6,7 @@ import { TopBar } from "@/components/TopBar";
 import { ProjectCard } from "@/components/ProjectCard";
 import { TodayPanel, type TodayCard } from "@/components/TodayPanel";
 import { requireUserProfile } from "@/lib/auth";
+import { parseMonthKey } from "@/lib/finance";
 import { PROJECT_STATUSES, PROJECT_TYPES, type DailyNote, type Message, type Profile, type Project, type ProjectRead, type ProjectStatus, type ProjectType } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,7 @@ type DashboardPageProps = {
     q?: string;
     status?: ProjectStatus | "Todos";
     type?: ProjectType | "Todos";
+    month?: string;
   };
 };
 
@@ -29,6 +31,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const q = searchParams.q?.trim() ?? "";
   const status = searchParams.status ?? "Todos";
   const projectType: ProjectType | "Todos" = PROJECT_TYPES.includes(searchParams.type as ProjectType) ? (searchParams.type as ProjectType) : "Todos";
+  const chartMonth = parseMonthKey(searchParams.month);
 
   let query = supabase
     .from("projects")
@@ -151,18 +154,28 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </Link>
         </div>
 
-        <DashboardStats projects={metricProjects} budgetItems={metricBudgetItems} />
+        <DashboardStats
+          projects={metricProjects}
+          budgetItems={metricBudgetItems}
+          monthKey={chartMonth.key}
+          month={chartMonth.month}
+          year={chartMonth.year}
+          q={q}
+          status={status}
+          projectType={projectType}
+        />
         <TodayPanel cards={todayCards} />
         <DailyNotesPanel notes={enrichedDailyNotes} />
 
         <form className="mt-5 grid gap-3 rounded-lg border border-line bg-white p-3 shadow-soft md:grid-cols-[1fr_220px_auto]">
           <div className="flex flex-wrap gap-2 md:col-span-3">
-            <ProjectTypeTab label="Todos" value="Todos" activeType={projectType} q={q} status={status} />
+            <ProjectTypeTab label="Todos" value="Todos" activeType={projectType} q={q} status={status} monthKey={chartMonth.key} />
             {PROJECT_TYPES.map((type) => (
-              <ProjectTypeTab key={type} label={type} value={type} activeType={projectType} q={q} status={status} />
+              <ProjectTypeTab key={type} label={type} value={type} activeType={projectType} q={q} status={status} monthKey={chartMonth.key} />
             ))}
           </div>
           <input type="hidden" name="type" value={projectType} />
+          <input type="hidden" name="month" value={chartMonth.key} />
           <label className="flex h-12 items-center gap-2 rounded-lg bg-paper px-3">
             <Search size={18} className="text-muted" />
             <input className="w-full bg-transparent text-sm font-semibold outline-none" name="q" defaultValue={q} placeholder="Buscar proyecto, cliente o direccion" />
@@ -266,14 +279,17 @@ function ProjectTypeTab({
   activeType,
   q,
   status,
+  monthKey,
 }: {
   label: string;
   value: ProjectType | "Todos";
   activeType: ProjectType | "Todos";
   q: string;
   status: ProjectStatus | "Todos";
+  monthKey: string;
 }) {
   const params = new URLSearchParams();
+  params.set("month", monthKey);
   if (q) {
     params.set("q", q);
   }
