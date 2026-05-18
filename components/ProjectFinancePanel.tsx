@@ -1,9 +1,9 @@
 "use client";
 
-import { FormEvent, useMemo, useTransition } from "react";
+import { FormEvent, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CreditCard, ReceiptText, Trash2 } from "lucide-react";
-import { createExpenseAction, createPaymentAction, deleteExpenseAction, deletePaymentAction } from "@/actions/financeActions";
+import { CreditCard, Pencil, ReceiptText, Save, Trash2, X } from "lucide-react";
+import { createExpenseAction, createPaymentAction, deleteExpenseAction, deletePaymentAction, updatePaymentAction } from "@/actions/financeActions";
 import { formatCurrency } from "@/lib/calculations";
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS, type ExpenseCategory, type PaymentMethod, type ProjectExpense, type ProjectPayment } from "@/lib/types";
 
@@ -21,6 +21,7 @@ function todayValue() {
 export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments }: ProjectFinancePanelProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
   const expenseTotal = useMemo(() => expenses.reduce((sum, expense) => sum + Number(expense.amount), 0), [expenses]);
   const paymentTotal = useMemo(() => payments.reduce((sum, payment) => sum + Number(payment.amount), 0), [payments]);
   const profit = budgetTotal - expenseTotal;
@@ -68,6 +69,18 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
 
     startTransition(async () => {
       await deletePaymentAction(formData);
+      router.refresh();
+    });
+  }
+
+  function updatePayment(event: FormEvent<HTMLFormElement>, paymentId: string) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    formData.set("payment_id", paymentId);
+
+    startTransition(async () => {
+      await updatePaymentAction(formData);
+      setEditingPaymentId(null);
       router.refresh();
     });
   }
@@ -175,15 +188,13 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
         <FinanceList
           title="Cobros"
           empty="No hay cobros registrados."
-          rows={payments.map((payment) => ({
-            id: payment.id,
-            title: payment.method,
-            meta: payment.payment_date,
-            amount: Number(payment.amount),
-            notes: payment.notes,
-            onDelete: () => removePayment(payment.id),
-          }))}
+          rows={payments}
           isPending={isPending}
+          projectId={projectId}
+          editingPaymentId={editingPaymentId}
+          setEditingPaymentId={setEditingPaymentId}
+          onUpdatePayment={updatePayment}
+          onDeletePayment={removePayment}
         />
       </div>
     </section>
@@ -207,12 +218,24 @@ function FinanceList({
   empty,
   rows,
   isPending,
+  projectId,
+  editingPaymentId,
+  setEditingPaymentId,
+  onUpdatePayment,
+  onDeletePayment,
 }: {
   title: string;
   empty: string;
-  rows: Array<{ id: string; title: string; meta: string; amount: number; notes?: string | null; onDelete: () => void }>;
+  rows: ProjectPayment[] | Array<{ id: string; title: string; meta: string; amount: number; notes?: string | null; onDelete: () => void }>;
   isPending: boolean;
+  projectId?: string;
+  editingPaymentId?: string | null;
+  setEditingPaymentId?: (id: string | null) => void;
+  onUpdatePayment?: (event: FormEvent<HTMLFormElement>, paymentId: string) => void;
+  onDeletePayment?: (paymentId: string) => void;
 }) {
+  const isPaymentList = Boolean(projectId && setEditingPaymentId && onUpdatePayment && onDeletePayment);
+
   return (
     <div className="rounded-lg border border-line bg-white p-3">
       <h3 className="font-black text-ink">{title}</h3>
@@ -220,25 +243,87 @@ function FinanceList({
         {rows.length === 0 ? (
           <p className="rounded-lg bg-paper p-3 text-sm font-semibold text-muted">{empty}</p>
         ) : (
-          rows.map((row) => (
-            <article key={row.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-line p-3">
-              <div>
-                <strong className="block text-sm text-ink">{row.title}</strong>
-                <p className="text-xs font-semibold text-muted">{row.meta}</p>
-                {row.notes ? <p className="mt-1 text-sm text-muted">{row.notes}</p> : null}
-              </div>
-              <strong className="whitespace-nowrap text-ink">{formatCurrency(row.amount)}</strong>
-              <button
-                className="grid h-10 w-10 place-items-center rounded-lg border border-line text-red-700 disabled:opacity-50"
-                disabled={isPending}
-                onClick={row.onDelete}
-                title="Borrar"
-                type="button"
-              >
-                <Trash2 size={17} />
-              </button>
-            </article>
-          ))
+          rows.map((row) => {
+            if (isPaymentList && "payment_date" in row) {
+              const isEditing = editingPaymentId === row.id;
+
+              return (
+                <article key={row.id} className="rounded-lg border border-line p-3">
+                  {isEditing ? (
+                    <form onSubmit={(event) => onUpdatePayment?.(event, row.id)} className="grid gap-3">
+                      <input type="hidden" name="project_id" value={projectId} />
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div>
+                          <label className="form-label" htmlFor={`payment-edit-amount-${row.id}`}>Importe</label>
+                          <input className="form-input" id={`payment-edit-amount-${row.id}`} name="amount" type="number" min="0" step="0.01" defaultValue={Number(row.amount)} required />
+                        </div>
+                        <div>
+                          <label className="form-label" htmlFor={`payment-edit-method-${row.id}`}>Metodo</label>
+                          <select className="form-input" id={`payment-edit-method-${row.id}`} name="method" defaultValue={row.method}>
+                            {PAYMENT_METHODS.map((method: PaymentMethod) => (
+                              <option key={method} value={method}>{method}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="form-label" htmlFor={`payment-edit-date-${row.id}`}>Fecha</label>
+                          <input className="form-input" id={`payment-edit-date-${row.id}`} name="payment_date" type="date" defaultValue={row.payment_date} />
+                        </div>
+                      </div>
+                      <textarea className="form-input min-h-20" name="notes" defaultValue={row.notes ?? ""} placeholder="Notas del cobro..." />
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <button className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-moss px-4 text-sm font-black text-white disabled:opacity-60" disabled={isPending}>
+                          <Save size={17} />
+                          Guardar cambios
+                        </button>
+                        <button className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line px-4 text-sm font-black text-ink" type="button" onClick={() => setEditingPaymentId?.(null)}>
+                          <X size={17} />
+                          Cancelar
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-2">
+                      <div>
+                        <strong className="block text-sm text-ink">{row.method}</strong>
+                        <p className="text-xs font-semibold text-muted">{row.payment_date}</p>
+                        {row.notes ? <p className="mt-1 text-sm text-muted">{row.notes}</p> : null}
+                      </div>
+                      <strong className="whitespace-nowrap text-ink">{formatCurrency(Number(row.amount))}</strong>
+                      <button className="grid h-10 w-10 place-items-center rounded-lg border border-line text-ink disabled:opacity-50" disabled={isPending} onClick={() => setEditingPaymentId?.(row.id)} title="Editar cobro" type="button">
+                        <Pencil size={17} />
+                      </button>
+                      <button className="grid h-10 w-10 place-items-center rounded-lg border border-line text-red-700 disabled:opacity-50" disabled={isPending} onClick={() => onDeletePayment?.(row.id)} title="Borrar" type="button">
+                        <Trash2 size={17} />
+                      </button>
+                    </div>
+                  )}
+                </article>
+              );
+            }
+
+            const expenseRow = row as { id: string; title: string; meta: string; amount: number; notes?: string | null; onDelete: () => void };
+
+            return (
+              <article key={expenseRow.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-line p-3">
+                <div>
+                  <strong className="block text-sm text-ink">{expenseRow.title}</strong>
+                  <p className="text-xs font-semibold text-muted">{expenseRow.meta}</p>
+                  {expenseRow.notes ? <p className="mt-1 text-sm text-muted">{expenseRow.notes}</p> : null}
+                </div>
+                <strong className="whitespace-nowrap text-ink">{formatCurrency(expenseRow.amount)}</strong>
+                <button
+                  className="grid h-10 w-10 place-items-center rounded-lg border border-line text-red-700 disabled:opacity-50"
+                  disabled={isPending}
+                  onClick={expenseRow.onDelete}
+                  title="Borrar"
+                  type="button"
+                >
+                  <Trash2 size={17} />
+                </button>
+              </article>
+            );
+          })
         )}
       </div>
     </div>

@@ -26,6 +26,12 @@ type DashboardBudgetItem = {
   created_at: string;
 };
 
+type DashboardPayment = {
+  project_id: string;
+  amount: number;
+  payment_date: string;
+};
+
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const { supabase, profile, user } = await requireUserProfile();
   const q = searchParams.q?.trim() ?? "";
@@ -60,6 +66,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     { data: dismissedItems, error: dismissedItemsError },
     { data: dailyNotes, error: dailyNotesError },
     { data: profiles, error: profilesError },
+    { data: payments, error: paymentsError },
   ] = await Promise.all([
     query.returns<Project[]>(),
     supabase.from("projects").select("*").order("created_at", { ascending: false }).returns<Project[]>(),
@@ -79,11 +86,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       .order("created_at", { ascending: false })
       .returns<DailyNote[]>(),
     supabase.from("profiles").select("*").returns<Profile[]>(),
+    supabase.from("project_payments").select("project_id,amount,payment_date").returns<DashboardPayment[]>(),
   ]);
 
   const dailyNotesTableMissing = dailyNotesError?.code === "42P01";
+  const paymentsTableMissing = paymentsError?.code === "42P01";
 
-  if (error || allProjectsError || budgetItemsError || messagesError || projectReadsError || dismissedItemsError || (dailyNotesError && !dailyNotesTableMissing) || profilesError) {
+  if (error || allProjectsError || budgetItemsError || messagesError || projectReadsError || dismissedItemsError || (dailyNotesError && !dailyNotesTableMissing) || profilesError || (paymentsError && !paymentsTableMissing)) {
     throw new Error(
       error?.message
         ?? allProjectsError?.message
@@ -92,7 +101,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         ?? projectReadsError?.message
         ?? dismissedItemsError?.message
         ?? dailyNotesError?.message
-        ?? profilesError?.message,
+        ?? profilesError?.message
+        ?? paymentsError?.message,
     );
   }
 
@@ -157,6 +167,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <DashboardStats
           projects={metricProjects}
           budgetItems={metricBudgetItems}
+          payments={paymentsTableMissing ? [] : (projectType === "Todos" ? (payments ?? []) : (payments ?? []).filter((payment) => metricProjectIds.has(payment.project_id)))}
           monthKey={chartMonth.key}
           month={chartMonth.month}
           year={chartMonth.year}

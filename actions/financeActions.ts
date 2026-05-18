@@ -104,6 +104,35 @@ export async function createPaymentAction(formData: FormData) {
   revalidatePath("/finance");
 }
 
+export async function updatePaymentAction(formData: FormData) {
+  const { supabase } = await requireUserProfile();
+  const paymentId = z.string().uuid().parse(formData.get("payment_id"));
+  const parsed = paymentSchema.safeParse({
+    ...Object.fromEntries(formData),
+    payment_date: formData.get("payment_date") || currentDateValue(),
+  });
+
+  if (!parsed.success) return;
+
+  const { error } = await supabase
+    .from("project_payments")
+    .update({
+      amount: parsed.data.amount,
+      payment_date: parsed.data.payment_date,
+      method: parsed.data.method,
+      notes: parsed.data.notes,
+    })
+    .eq("id", paymentId)
+    .eq("project_id", parsed.data.project_id);
+
+  if (error) throw new Error(error.message);
+
+  await touchProject(supabase, parsed.data.project_id);
+  revalidatePath(`/projects/${parsed.data.project_id}`);
+  revalidatePath("/dashboard");
+  revalidatePath("/finance");
+}
+
 export async function deletePaymentAction(formData: FormData) {
   const { supabase } = await requireUserProfile();
   const paymentId = z.string().uuid().parse(formData.get("payment_id"));

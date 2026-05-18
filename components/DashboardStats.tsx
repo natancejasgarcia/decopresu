@@ -14,12 +14,19 @@ type ProjectBudget = {
 type DashboardStatsProps = {
   projects: Project[];
   budgetItems: ProjectBudget[];
+  payments: ProjectPaymentSummary[];
   monthKey: string;
   year: number;
   month: number;
   q: string;
   status: ProjectStatus | "Todos";
   projectType: ProjectType | "Todos";
+};
+
+type ProjectPaymentSummary = {
+  project_id: string;
+  amount: number;
+  payment_date: string;
 };
 
 type ChartDay = {
@@ -38,7 +45,7 @@ const STATUS_TONES: Record<ProjectStatus, { badge: string; dot: string }> = {
   Cobrado: { badge: "bg-teal-50 text-teal-800", dot: "bg-teal-600" },
 };
 
-export function DashboardStats({ projects, budgetItems, monthKey, year, month, q, status, projectType }: DashboardStatsProps) {
+export function DashboardStats({ projects, budgetItems, payments, monthKey, year, month, q, status, projectType }: DashboardStatsProps) {
   const now = new Date();
   const todayKey = toDayKey(now);
   const currentMonth = now.getMonth();
@@ -70,12 +77,12 @@ export function DashboardStats({ projects, budgetItems, monthKey, year, month, q
   const pendingApproval = projects
     .filter((project) => project.status === "Presupuestado")
     .reduce((sum, project) => sum + (totalsByProject.get(project.id) ?? 0), 0);
-  const collectedThisMonth = projects
-    .filter((project) => {
-      const createdAt = new Date(project.created_at);
-      return project.status === "Cobrado" && createdAt.getMonth() === currentMonth && createdAt.getFullYear() === currentYear;
+  const collectedThisMonth = payments
+    .filter((payment) => {
+      const paidAt = new Date(`${payment.payment_date}T00:00:00`);
+      return paidAt.getMonth() === currentMonth && paidAt.getFullYear() === currentYear;
     })
-    .reduce((sum, project) => sum + (totalsByProject.get(project.id) ?? 0), 0);
+    .reduce((sum, payment) => sum + Number(payment.amount), 0);
 
   const statusRows = buildStatusRows(projects, totalsByProject);
   const chartDays = buildMonthDays(year, month);
