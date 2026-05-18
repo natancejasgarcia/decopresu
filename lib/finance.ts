@@ -109,6 +109,8 @@ export function buildDailyFinanceSeries({
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   let incomeRunning = 0;
   let expenseRunning = 0;
+  const fixedCostMonthlyTotal = fixedCosts.filter((cost) => cost.is_active).reduce((sum, cost) => sum + monthlyFixedCostAmount(cost), 0);
+  const fixedCostPerDay = fixedCostMonthlyTotal / daysInMonth;
 
   return Array.from({ length: daysInMonth }, (_, index) => {
     const day = index + 1;
@@ -118,12 +120,9 @@ export function buildDailyFinanceSeries({
     const expensesForDay = expenses
       .filter((expense) => isSameDay(expense.expense_date, year, month, day))
       .reduce((sum, expense) => sum + Number(expense.amount), 0);
-    const fixedForDay = fixedCosts
-      .filter((cost) => cost.is_active && isSameDay(cost.next_payment_date, year, month, day))
-      .reduce((sum, cost) => sum + Number(cost.amount), 0);
 
     incomeRunning += income;
-    expenseRunning += expensesForDay + fixedForDay;
+    expenseRunning += expensesForDay + fixedCostPerDay;
 
     return {
       label: String(day),

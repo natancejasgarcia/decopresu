@@ -78,14 +78,21 @@ export function FinanceDashboard({ projects, budgetItems, expenses, payments, fi
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-black uppercase text-clay">Grafica mensual</p>
-            <h2 className="text-xl font-black text-ink">Ingresos, gastos y beneficio acumulado</h2>
+            <h2 className="text-xl font-black text-ink">Foto real del mes</h2>
+            <p className="mt-1 text-sm font-semibold text-muted">Compara cobrado, gastos de obra, costes fijos y beneficio con la misma escala.</p>
           </div>
           <BarChart3 className="text-moss" size={22} />
         </div>
-        <FinanceLineChart points={series} />
+        <FinanceOverviewChart
+          income={finance.collectedAmount}
+          projectExpenses={finance.expenseAmount}
+          fixedCosts={finance.fixedCostAmount}
+          profit={finance.profit}
+          points={series}
+        />
         <div className="mt-4 flex flex-wrap gap-2">
           <Legend color="bg-emerald-500" label="Ingresos" />
-          <Legend color="bg-red-400" label="Gastos" />
+          <Legend color="bg-red-400" label="Gastos totales" />
           <Legend color="bg-steel" label="Beneficio" />
         </div>
       </section>
@@ -289,16 +296,74 @@ function StatCard({ icon, label, value, detail, tone }: { icon: React.ReactNode;
   );
 }
 
-function FinanceLineChart({ points }: { points: Array<{ label: string; income: number; expenses: number; profit: number }> }) {
+function FinanceOverviewChart({
+  income,
+  projectExpenses,
+  fixedCosts,
+  profit,
+  points,
+}: {
+  income: number;
+  projectExpenses: number;
+  fixedCosts: number;
+  profit: number;
+  points: Array<{ label: string; income: number; expenses: number; profit: number }>;
+}) {
+  const totalExpenses = projectExpenses + fixedCosts;
+  const maxBar = Math.max(income, projectExpenses, fixedCosts, totalExpenses, Math.abs(profit), 1);
+
+  return (
+    <div className="grid gap-4">
+      <div className="grid gap-3 lg:grid-cols-[0.85fr_1.15fr]">
+        <div className="rounded-lg bg-paper p-4">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase text-muted">Resultado</p>
+              <strong className={`mt-1 block text-3xl ${profit >= 0 ? "text-emerald-800" : "text-red-700"}`}>{formatCurrency(profit)}</strong>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-xs font-black ${profit >= 0 ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}>
+              {profit >= 0 ? "Beneficio" : "Perdida"}
+            </span>
+          </div>
+          <div className="grid gap-3">
+            <FinanceBar label="Cobrado" amount={income} max={maxBar} color="bg-emerald-500" />
+            <FinanceBar label="Gastos de obra" amount={projectExpenses} max={maxBar} color="bg-red-400" />
+            <FinanceBar label="Costes fijos" amount={fixedCosts} max={maxBar} color="bg-orange-400" />
+            <FinanceBar label="Gastos totales" amount={totalExpenses} max={maxBar} color="bg-red-600" strong />
+          </div>
+        </div>
+        <FinanceLineChart points={points} maxValue={maxBar} />
+      </div>
+    </div>
+  );
+}
+
+function FinanceBar({ label, amount, max, color, strong = false }: { label: string; amount: number; max: number; color: string; strong?: boolean }) {
+  const width = Math.max((Math.abs(amount) / max) * 100, amount > 0 ? 4 : 0);
+
+  return (
+    <div className="grid gap-2">
+      <div className="flex items-center justify-between gap-3">
+        <span className={`text-sm ${strong ? "font-black text-ink" : "font-bold text-muted"}`}>{label}</span>
+        <span className="text-sm font-black text-ink">{formatCurrency(amount)}</span>
+      </div>
+      <div className="h-4 overflow-hidden rounded-full bg-white ring-1 ring-line">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${width}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function FinanceLineChart({ points, maxValue }: { points: Array<{ label: string; income: number; expenses: number; profit: number }>; maxValue: number }) {
   const width = 760;
   const height = 250;
   const padding = { top: 22, right: 20, bottom: 36, left: 54 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
-  const maxValue = Math.max(...points.flatMap((point) => [point.income, point.expenses, Math.abs(point.profit)]), 1);
-  const incomePoints = buildPoints(points.map((point) => point.income), maxValue, chartWidth, chartHeight, padding);
-  const expensePoints = buildPoints(points.map((point) => point.expenses), maxValue, chartWidth, chartHeight, padding);
-  const profitPoints = buildPoints(points.map((point) => Math.max(point.profit, 0)), maxValue, chartWidth, chartHeight, padding);
+  const lineMax = Math.max(...points.flatMap((point) => [point.income, point.expenses, Math.abs(point.profit)]), maxValue, 1);
+  const incomePoints = buildPoints(points.map((point) => point.income), lineMax, chartWidth, chartHeight, padding);
+  const expensePoints = buildPoints(points.map((point) => point.expenses), lineMax, chartWidth, chartHeight, padding);
+  const profitPoints = buildPoints(points.map((point) => Math.max(point.profit, 0)), lineMax, chartWidth, chartHeight, padding);
 
   return (
     <svg className="h-auto w-full rounded-lg bg-paper p-2" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Grafica financiera mensual">
@@ -307,7 +372,7 @@ function FinanceLineChart({ points }: { points: Array<{ label: string; income: n
         return (
           <g key={value}>
             <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="#d9e0db" strokeDasharray="5 6" />
-            <text x={padding.left - 10} y={y + 4} textAnchor="end" className="fill-muted text-[10px] font-bold">{shortMoney(maxValue * value)}</text>
+            <text x={padding.left - 10} y={y + 4} textAnchor="end" className="fill-muted text-[10px] font-bold">{shortMoney(lineMax * value)}</text>
           </g>
         );
       })}
