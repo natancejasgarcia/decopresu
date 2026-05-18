@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, Banknote, CreditCard, Euro, ReceiptText, Trash2, TrendingUp, WalletCards } from "lucide-react";
+import { BarChart3, Banknote, CreditCard, Euro, ReceiptText, Trash2, TrendingDown, TrendingUp, WalletCards } from "lucide-react";
 import { createExpenseAction, createFixedCostAction, createPaymentAction, deleteExpenseAction, deleteFixedCostAction, deletePaymentAction } from "@/actions/financeActions";
 import { formatCurrency } from "@/lib/calculations";
 import { buildDailyFinanceSeries, buildMonthlyFinance, monthLabel, monthlyFixedCostAmount } from "@/lib/finance";
@@ -67,21 +67,24 @@ export function FinanceDashboard({ projects, budgetItems, expenses, payments, fi
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={<Euro size={20} />} label="Cobrado este mes" value={formatCurrency(finance.collectedAmount)} detail={`${finance.monthPayments.length} cobros`} tone="green" />
         <StatCard icon={<ReceiptText size={20} />} label="Gastos de obras" value={formatCurrency(finance.expenseAmount)} detail={`${finance.monthExpenses.length} gastos`} tone="red" />
-        <StatCard icon={<WalletCards size={20} />} label="Costes fijos mes" value={formatCurrency(finance.fixedCostAmount)} detail={`${fixedCosts.filter((cost) => cost.is_active).length} activos`} tone="warm" />
-        <StatCard icon={<TrendingUp size={20} />} label="Beneficio del mes" value={formatCurrency(finance.profit)} detail={`Pendiente ${formatCurrency(finance.pendingCollection)}`} tone={finance.profit >= 0 ? "green" : "red"} />
+        <StatCard icon={<WalletCards size={20} />} label="Costes fijos mes" value={formatCurrency(finance.fixedCostAmount)} detail={`${fixedCosts.filter((cost) => cost.is_active).length} activos`} tone="blue" />
+        <StatCard icon={finance.profit >= 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />} label="Resultado del mes" value={formatCurrency(finance.profit)} detail={`Pendiente ${formatCurrency(finance.pendingCollection)}`} tone={finance.profit >= 0 ? "green" : "red"} />
       </section>
 
-      <section className="rounded-lg border border-line bg-white p-4 shadow-soft">
-        <div className="mb-4 flex items-center justify-between gap-3">
+      <section className="rounded-lg border border-line bg-white p-5 shadow-soft">
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-xs font-black uppercase text-clay">Grafica mensual</p>
-            <h2 className="text-xl font-black text-ink">Foto real del mes</h2>
+            <h2 className="text-2xl font-black text-ink">Evolucion financiera</h2>
             <p className="mt-1 text-sm font-semibold text-muted">Compara cobrado, gastos de obra, costes fijos y beneficio con la misma escala.</p>
           </div>
-          <BarChart3 className="text-moss" size={22} />
+          <div className="inline-flex items-center gap-2 rounded-xl bg-paper px-4 py-3 text-sm font-black text-moss">
+            <BarChart3 size={20} />
+            {monthLabel(year, month)}
+          </div>
         </div>
         <FinanceOverviewChart
           income={finance.collectedAmount}
@@ -283,15 +286,33 @@ export function FinanceDashboard({ projects, budgetItems, expenses, payments, fi
   );
 }
 
-function StatCard({ icon, label, value, detail, tone }: { icon: React.ReactNode; label: string; value: string; detail: string; tone: "green" | "red" | "warm" }) {
-  const toneClass = tone === "green" ? "bg-emerald-50 text-emerald-800" : tone === "red" ? "bg-red-50 text-red-700" : "bg-orange-50 text-orange-800";
+function StatCard({ icon, label, value, detail, tone }: { icon: React.ReactNode; label: string; value: string; detail: string; tone: "green" | "red" | "warm" | "blue" }) {
+  const toneClass =
+    tone === "green"
+      ? "bg-emerald-50 text-emerald-700"
+      : tone === "red"
+        ? "bg-rose-50 text-rose-700"
+        : tone === "blue"
+          ? "bg-sky-50 text-sky-700"
+          : "bg-orange-50 text-orange-700";
+  const accentClass =
+    tone === "green"
+      ? "from-emerald-500/16"
+      : tone === "red"
+        ? "from-rose-500/16"
+        : tone === "blue"
+          ? "from-sky-500/16"
+          : "from-orange-500/16";
 
   return (
-    <article className="rounded-lg border border-line bg-white p-4 shadow-soft">
-      <div className={`mb-3 grid h-10 w-10 place-items-center rounded-lg ${toneClass}`}>{icon}</div>
+    <article className={`relative overflow-hidden rounded-xl border border-line bg-white p-5 shadow-soft`}>
+      <div className={`absolute inset-x-0 top-0 h-24 bg-gradient-to-b ${accentClass} to-transparent`} />
+      <div className="relative">
+      <div className={`mb-4 grid h-11 w-11 place-items-center rounded-xl ${toneClass}`}>{icon}</div>
       <p className="text-xs font-black uppercase text-muted">{label}</p>
       <strong className="mt-1 block text-2xl text-ink">{value}</strong>
       <p className="mt-1 text-sm font-semibold text-muted">{detail}</p>
+      </div>
     </article>
   );
 }
@@ -314,22 +335,22 @@ function FinanceOverviewChart({
 
   return (
     <div className="grid gap-4">
-      <div className="grid gap-3 lg:grid-cols-[0.85fr_1.15fr]">
-        <div className="rounded-lg bg-paper p-4">
+      <div className="grid gap-4 lg:grid-cols-[0.88fr_1.12fr]">
+        <div className="rounded-xl border border-line bg-gradient-to-br from-white to-paper p-5">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-black uppercase text-muted">Resultado</p>
-              <strong className={`mt-1 block text-3xl ${profit >= 0 ? "text-emerald-800" : "text-red-700"}`}>{formatCurrency(profit)}</strong>
+              <strong className={`mt-1 block text-3xl ${profit >= 0 ? "text-emerald-800" : "text-rose-700"}`}>{formatCurrency(profit)}</strong>
             </div>
-            <span className={`rounded-full px-3 py-1 text-xs font-black ${profit >= 0 ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}>
+            <span className={`rounded-full px-3 py-1 text-xs font-black ${profit >= 0 ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-700"}`}>
               {profit >= 0 ? "Beneficio" : "Perdida"}
             </span>
           </div>
           <div className="grid gap-3">
-            <FinanceBar label="Cobrado" amount={income} max={maxBar} color="bg-emerald-500" />
-            <FinanceBar label="Gastos de obra" amount={projectExpenses} max={maxBar} color="bg-red-400" />
-            <FinanceBar label="Costes fijos" amount={fixedCosts} max={maxBar} color="bg-orange-400" />
-            <FinanceBar label="Gastos totales" amount={totalExpenses} max={maxBar} color="bg-red-600" strong />
+            <FinanceBar label="Cobrado" amount={income} max={maxBar} color="bg-gradient-to-r from-emerald-400 to-emerald-600" />
+            <FinanceBar label="Gastos de obra" amount={projectExpenses} max={maxBar} color="bg-gradient-to-r from-rose-300 to-rose-500" />
+            <FinanceBar label="Costes fijos" amount={fixedCosts} max={maxBar} color="bg-gradient-to-r from-sky-300 to-blue-500" />
+            <FinanceBar label="Gastos totales" amount={totalExpenses} max={maxBar} color="bg-gradient-to-r from-orange-400 to-rose-600" strong />
           </div>
         </div>
         <FinanceLineChart points={points} maxValue={maxBar} />
@@ -366,7 +387,20 @@ function FinanceLineChart({ points, maxValue }: { points: Array<{ label: string;
   const profitPoints = buildPoints(points.map((point) => Math.max(point.profit, 0)), lineMax, chartWidth, chartHeight, padding);
 
   return (
-    <svg className="h-auto w-full rounded-lg bg-paper p-2" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Grafica financiera mensual">
+    <svg className="h-auto w-full rounded-xl bg-[#f8faf8] p-2 ring-1 ring-line" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Grafica financiera mensual">
+      <defs>
+        <linearGradient id="financeIncomeArea" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor="#10b981" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="financeExpenseArea" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor="#fb7185" stopOpacity="0.16" />
+          <stop offset="100%" stopColor="#fb7185" stopOpacity="0" />
+        </linearGradient>
+        <filter id="financeGlow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#1f2a2b" floodOpacity="0.12" />
+        </filter>
+      </defs>
       {[0.25, 0.5, 0.75, 1].map((value) => {
         const y = padding.top + chartHeight - chartHeight * value;
         return (
@@ -376,9 +410,21 @@ function FinanceLineChart({ points, maxValue }: { points: Array<{ label: string;
           </g>
         );
       })}
-      <polyline points={incomePoints} fill="none" stroke="#10b981" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
-      <polyline points={expensePoints} fill="none" stroke="#f87171" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
+      <path d={buildAreaPath(incomePoints, height - padding.bottom)} fill="url(#financeIncomeArea)" />
+      <path d={buildAreaPath(expensePoints, height - padding.bottom)} fill="url(#financeExpenseArea)" />
+      <polyline points={incomePoints} fill="none" stroke="#10b981" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" filter="url(#financeGlow)" />
+      <polyline points={expensePoints} fill="none" stroke="#fb7185" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" filter="url(#financeGlow)" />
       <polyline points={profitPoints} fill="none" stroke="#335f82" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
+      {incomePoints.split(" ").filter(Boolean).map((point, index) => {
+        if (index !== 0 && index !== points.length - 1 && index % 5 !== 0) return null;
+        const [x, y] = point.split(",").map(Number);
+        return <circle key={`income-${index}`} cx={x} cy={y} r="4" fill="#10b981" stroke="#ffffff" strokeWidth="2" />;
+      })}
+      {expensePoints.split(" ").filter(Boolean).map((point, index) => {
+        if (index !== 0 && index !== points.length - 1 && index % 5 !== 0) return null;
+        const [x, y] = point.split(",").map(Number);
+        return <circle key={`expense-${index}`} cx={x} cy={y} r="4" fill="#fb7185" stroke="#ffffff" strokeWidth="2" />;
+      })}
       {points.map((point, index) => {
         if (index !== 0 && index !== points.length - 1 && index % 5 !== 0) return null;
         const x = padding.left + (chartWidth / Math.max(points.length - 1, 1)) * index;
@@ -487,6 +533,16 @@ function buildPoints(values: number[], maxValue: number, width: number, height: 
       return `${x.toFixed(2)},${y.toFixed(2)}`;
     })
     .join(" ");
+}
+
+function buildAreaPath(points: string, baselineY: number) {
+  const splitPoints = points.split(" ");
+  const first = splitPoints[0];
+  const last = splitPoints[splitPoints.length - 1];
+  const firstX = first.split(",")[0];
+  const lastX = last.split(",")[0];
+
+  return `M ${firstX},${baselineY} L ${points.replaceAll(" ", " L ")} L ${lastX},${baselineY} Z`;
 }
 
 function shortMoney(value: number) {
