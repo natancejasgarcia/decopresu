@@ -20,7 +20,7 @@ export async function sendDecoraliaEmailAction(formData: FormData) {
     return { ok: false, message: "Revisa el email, asunto y mensaje." };
   }
 
-  const html = buildEmailHtml(parsed.data.body);
+  const html = buildEmailHtml(parsed.data.body, getLogoUrl());
   const text = buildEmailText(parsed.data.body);
 
   try {
@@ -83,7 +83,7 @@ info@decoraliapintores.es
 `;
 }
 
-function buildEmailHtml(body: string) {
+function buildEmailHtml(body: string, logoUrl: string) {
   const paragraphs = body
     .split(/\n{2,}/)
     .map((paragraph) => paragraph.trim())
@@ -97,7 +97,7 @@ function buildEmailHtml(body: string) {
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #d9e0db;border-radius:10px;overflow:hidden;">
       <tr>
         <td style="padding:26px 28px 16px;border-bottom:1px solid #d9e0db;">
-          <img src="cid:decoralia-logo" alt="Decoralia Pintores" style="display:block;max-width:360px;width:100%;height:auto;" />
+          <img src="${logoUrl}" alt="Decoralia Pintores" style="display:block;max-width:360px;width:100%;height:auto;" />
         </td>
       </tr>
       <tr>
@@ -115,6 +115,14 @@ function buildEmailHtml(body: string) {
     </table>
   </body>
 </html>`;
+}
+
+function getLogoUrl() {
+  const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL;
+  const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null;
+  const baseUrl = (configuredUrl || vercelUrl || "https://decoraliapintores.es").replace(/\/$/, "");
+
+  return `${baseUrl}/decoralia-logo.png`;
 }
 
 function escapeHtml(value: string) {

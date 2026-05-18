@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import tls from "node:tls";
 
 type SmtpConfig = {
@@ -33,13 +31,11 @@ export function getSmtpConfig(): SmtpConfig {
 
 export async function sendSmtpEmail(input: SendEmailInput) {
   const config = getSmtpConfig();
-  const logoBytes = await readFile(path.join(process.cwd(), "public", "decoralia-logo.png"));
-  const message = buildMimeMessage(input, config, logoBytes.toString("base64"));
+  const message = buildMimeMessage(input, config);
   await sendRawSmtpMessage(config, input.to, message);
 }
 
-function buildMimeMessage(input: SendEmailInput, config: SmtpConfig, logoBase64: string) {
-  const relatedBoundary = `decoralia-related-${Date.now()}`;
+function buildMimeMessage(input: SendEmailInput, config: SmtpConfig) {
   const alternativeBoundary = `decoralia-alt-${Date.now()}`;
   const from = `"${escapeHeader(config.fromName)}" <${config.user}>`;
   const headers = [
@@ -47,14 +43,11 @@ function buildMimeMessage(input: SendEmailInput, config: SmtpConfig, logoBase64:
     `To: ${input.to}`,
     `Subject: ${encodeHeader(input.subject)}`,
     "MIME-Version: 1.0",
-    `Content-Type: multipart/related; boundary="${relatedBoundary}"`,
+    `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`,
   ];
 
   return [
     ...headers,
-    "",
-    `--${relatedBoundary}`,
-    `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`,
     "",
     `--${alternativeBoundary}`,
     `Content-Type: text/plain; charset="UTF-8"`,
@@ -69,16 +62,6 @@ function buildMimeMessage(input: SendEmailInput, config: SmtpConfig, logoBase64:
     input.html,
     "",
     `--${alternativeBoundary}--`,
-    "",
-    `--${relatedBoundary}`,
-    `Content-Type: image/png; name="decoralia-logo.png"`,
-    "Content-Transfer-Encoding: base64",
-    `Content-ID: <decoralia-logo>`,
-    `Content-Disposition: inline; filename="decoralia-logo.png"`,
-    "",
-    chunkBase64(logoBase64),
-    "",
-    `--${relatedBoundary}--`,
     "",
   ].join("\r\n");
 }
@@ -157,8 +140,4 @@ function escapeHeader(value: string) {
 
 function escapeSmtpData(value: string) {
   return value.replace(/^\./gm, "..");
-}
-
-function chunkBase64(value: string) {
-  return value.match(/.{1,76}/g)?.join("\r\n") ?? value;
 }
