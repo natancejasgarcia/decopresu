@@ -171,6 +171,18 @@ create table if not exists public.fixed_costs (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.sent_emails (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid references public.projects(id) on delete set null,
+  to_email text not null,
+  subject text not null,
+  body text not null,
+  status text not null default 'sent' check (status in ('sent', 'failed')),
+  error_message text,
+  sent_by uuid not null references public.profiles(user_id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
 drop trigger if exists set_projects_updated_at on public.projects;
 create trigger set_projects_updated_at
 before update on public.projects
@@ -204,6 +216,8 @@ create index if not exists project_expenses_date_idx on public.project_expenses(
 create index if not exists project_payments_project_date_idx on public.project_payments(project_id, payment_date desc);
 create index if not exists project_payments_date_idx on public.project_payments(payment_date desc);
 create index if not exists fixed_costs_active_date_idx on public.fixed_costs(is_active, next_payment_date);
+create index if not exists sent_emails_created_at_idx on public.sent_emails(created_at desc);
+create index if not exists sent_emails_project_idx on public.sent_emails(project_id, created_at desc);
 
 alter table public.profiles enable row level security;
 alter table public.projects enable row level security;
@@ -217,6 +231,7 @@ alter table public.budget_items enable row level security;
 alter table public.project_expenses enable row level security;
 alter table public.project_payments enable row level security;
 alter table public.fixed_costs enable row level security;
+alter table public.sent_emails enable row level security;
 
 create or replace function public.is_decoralia_user()
 returns boolean
@@ -356,6 +371,13 @@ on public.fixed_costs for all
 to authenticated
 using (public.is_decoralia_user())
 with check (public.is_decoralia_user() and created_by = auth.uid());
+
+drop policy if exists "sent_emails_all_authorized" on public.sent_emails;
+create policy "sent_emails_all_authorized"
+on public.sent_emails for all
+to authenticated
+using (public.is_decoralia_user())
+with check (public.is_decoralia_user() and sent_by = auth.uid());
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (

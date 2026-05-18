@@ -178,3 +178,17 @@ export type FixedCost = {
   created_by: string;
   created_at: string;
 };
+
+export type SentEmailStatus = "sent" | "failed";
+
+export type SentEmail = {
+  id: string;
+  project_id: string | null;
+  to_email: string;
+  subject: string;
+  body: string;
+  status: SentEmailStatus;
+  error_message: string | null;
+  sent_by: string;
+  created_at: string;
+};
