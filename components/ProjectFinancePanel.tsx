@@ -22,6 +22,7 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const expenseTotal = useMemo(() => expenses.reduce((sum, expense) => sum + Number(expense.amount), 0), [expenses]);
   const paymentTotal = useMemo(() => payments.reduce((sum, payment) => sum + Number(payment.amount), 0), [payments]);
   const profit = budgetTotal - expenseTotal;
@@ -31,11 +32,16 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
+    setErrorMessage(null);
 
     startTransition(async () => {
-      await createExpenseAction(formData);
-      form.reset();
-      router.refresh();
+      try {
+        await createExpenseAction(formData);
+        form.reset();
+        router.refresh();
+      } catch (error) {
+        setErrorMessage(getActionErrorMessage(error));
+      }
     });
   }
 
@@ -43,11 +49,16 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
+    setErrorMessage(null);
 
     startTransition(async () => {
-      await createPaymentAction(formData);
-      form.reset();
-      router.refresh();
+      try {
+        await createPaymentAction(formData);
+        form.reset();
+        router.refresh();
+      } catch (error) {
+        setErrorMessage(getActionErrorMessage(error));
+      }
     });
   }
 
@@ -55,10 +66,15 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
     const formData = new FormData();
     formData.set("expense_id", expenseId);
     formData.set("project_id", projectId);
+    setErrorMessage(null);
 
     startTransition(async () => {
-      await deleteExpenseAction(formData);
-      router.refresh();
+      try {
+        await deleteExpenseAction(formData);
+        router.refresh();
+      } catch (error) {
+        setErrorMessage(getActionErrorMessage(error));
+      }
     });
   }
 
@@ -66,10 +82,15 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
     const formData = new FormData();
     formData.set("payment_id", paymentId);
     formData.set("project_id", projectId);
+    setErrorMessage(null);
 
     startTransition(async () => {
-      await deletePaymentAction(formData);
-      router.refresh();
+      try {
+        await deletePaymentAction(formData);
+        router.refresh();
+      } catch (error) {
+        setErrorMessage(getActionErrorMessage(error));
+      }
     });
   }
 
@@ -77,11 +98,16 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     formData.set("payment_id", paymentId);
+    setErrorMessage(null);
 
     startTransition(async () => {
-      await updatePaymentAction(formData);
-      setEditingPaymentId(null);
-      router.refresh();
+      try {
+        await updatePaymentAction(formData);
+        setEditingPaymentId(null);
+        router.refresh();
+      } catch (error) {
+        setErrorMessage(getActionErrorMessage(error));
+      }
     });
   }
 
@@ -93,6 +119,11 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
           <p className="text-sm font-semibold text-muted">Controla lo que cuesta y lo que se cobra en esta obra.</p>
         </div>
       </div>
+      {errorMessage ? (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">
+          {errorMessage}
+        </div>
+      ) : null}
 
       <div className="grid gap-3 md:grid-cols-4">
         <FinanceCard label="Presupuesto" value={formatCurrency(budgetTotal)} />
@@ -199,6 +230,14 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
       </div>
     </section>
   );
+}
+
+function getActionErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "No se pudo guardar el cambio. Revisa los datos e inténtalo otra vez.";
 }
 
 function FinanceCard({ label, value, detail, tone = "default" }: { label: string; value: string; detail?: string; tone?: "default" | "green" | "red" }) {
