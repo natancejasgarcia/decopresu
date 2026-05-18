@@ -118,9 +118,15 @@ function buildEmailHtml(body: string, logoUrl: string) {
 }
 
 function getLogoUrl() {
-  const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL;
+  const explicitLogoUrl = process.env.EMAIL_LOGO_URL;
+
+  if (explicitLogoUrl) {
+    return explicitLogoUrl;
+  }
+
   const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null;
-  const baseUrl = (configuredUrl || vercelUrl || "https://decoraliapintores.es").replace(/\/$/, "");
+  const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL;
+  const baseUrl = (vercelUrl || configuredUrl || "https://decoraliapintores.com").replace(/\/$/, "");
 
   return `${baseUrl}/decoralia-logo.png`;
 }
