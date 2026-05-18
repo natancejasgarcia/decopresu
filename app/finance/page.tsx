@@ -35,9 +35,9 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
     throw new Error(projectsError?.message ?? budgetItemsError?.message);
   }
 
-  const financeTablesMissing = expensesError?.code === "42P01" || paymentsError?.code === "42P01" || fixedCostsError?.code === "42P01";
+  const financeTablesUnavailable = isOptionalFinanceError(expensesError) || isOptionalFinanceError(paymentsError) || isOptionalFinanceError(fixedCostsError);
 
-  if (!financeTablesMissing && (expensesError || paymentsError || fixedCostsError)) {
+  if (!financeTablesUnavailable && (expensesError || paymentsError || fixedCostsError)) {
     throw new Error(expensesError?.message ?? paymentsError?.message ?? fixedCostsError?.message);
   }
 
@@ -48,9 +48,9 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
         <FinanceDashboard
           projects={projects ?? []}
           budgetItems={sortBudgetItems(budgetItems ?? [])}
-          expenses={financeTablesMissing ? [] : (expenses ?? [])}
-          payments={financeTablesMissing ? [] : (payments ?? [])}
-          fixedCosts={financeTablesMissing ? [] : (fixedCosts ?? [])}
+          expenses={financeTablesUnavailable ? [] : (expenses ?? [])}
+          payments={financeTablesUnavailable ? [] : (payments ?? [])}
+          fixedCosts={financeTablesUnavailable ? [] : (fixedCosts ?? [])}
           year={year}
           month={month}
           monthKey={key}
@@ -58,4 +58,9 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
       </div>
     </main>
   );
+}
+
+function isOptionalFinanceError(error: { code?: string } | null) {
+  if (!error) return false;
+  return error.code === "42P01" || error.code === "42703" || error.code === "42501";
 }

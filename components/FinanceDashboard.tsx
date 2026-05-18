@@ -330,8 +330,12 @@ function FinanceOverviewChart({
   profit: number;
   points: Array<{ label: string; income: number; expenses: number; profit: number }>;
 }) {
-  const totalExpenses = projectExpenses + fixedCosts;
-  const maxBar = Math.max(income, projectExpenses, fixedCosts, totalExpenses, Math.abs(profit), 1);
+  const safeIncome = safeNumber(income);
+  const safeProjectExpenses = safeNumber(projectExpenses);
+  const safeFixedCosts = safeNumber(fixedCosts);
+  const safeProfit = safeNumber(profit);
+  const totalExpenses = safeProjectExpenses + safeFixedCosts;
+  const maxBar = safeMax([safeIncome, safeProjectExpenses, safeFixedCosts, totalExpenses, Math.abs(safeProfit), 1]);
 
   return (
     <div className="grid gap-4">
@@ -340,16 +344,16 @@ function FinanceOverviewChart({
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-black uppercase text-muted">Resultado</p>
-              <strong className={`mt-1 block text-3xl ${profit >= 0 ? "text-emerald-800" : "text-rose-700"}`}>{formatCurrency(profit)}</strong>
+              <strong className={`mt-1 block text-3xl ${safeProfit >= 0 ? "text-emerald-800" : "text-rose-700"}`}>{formatCurrency(safeProfit)}</strong>
             </div>
-            <span className={`rounded-full px-3 py-1 text-xs font-black ${profit >= 0 ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-700"}`}>
-              {profit >= 0 ? "Beneficio" : "Perdida"}
+            <span className={`rounded-full px-3 py-1 text-xs font-black ${safeProfit >= 0 ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-700"}`}>
+              {safeProfit >= 0 ? "Beneficio" : "Perdida"}
             </span>
           </div>
           <div className="grid gap-3">
-            <FinanceBar label="Cobrado" amount={income} max={maxBar} color="bg-gradient-to-r from-emerald-400 to-emerald-600" />
-            <FinanceBar label="Gastos de obra" amount={projectExpenses} max={maxBar} color="bg-gradient-to-r from-rose-300 to-rose-500" />
-            <FinanceBar label="Costes fijos" amount={fixedCosts} max={maxBar} color="bg-gradient-to-r from-sky-300 to-blue-500" />
+            <FinanceBar label="Cobrado" amount={safeIncome} max={maxBar} color="bg-gradient-to-r from-emerald-400 to-emerald-600" />
+            <FinanceBar label="Gastos de obra" amount={safeProjectExpenses} max={maxBar} color="bg-gradient-to-r from-rose-300 to-rose-500" />
+            <FinanceBar label="Costes fijos" amount={safeFixedCosts} max={maxBar} color="bg-gradient-to-r from-sky-300 to-blue-500" />
             <FinanceBar label="Gastos totales" amount={totalExpenses} max={maxBar} color="bg-gradient-to-r from-orange-400 to-rose-600" strong />
           </div>
         </div>
@@ -360,13 +364,15 @@ function FinanceOverviewChart({
 }
 
 function FinanceBar({ label, amount, max, color, strong = false }: { label: string; amount: number; max: number; color: string; strong?: boolean }) {
-  const width = Math.max((Math.abs(amount) / max) * 100, amount > 0 ? 4 : 0);
+  const safeAmount = safeNumber(amount);
+  const safeMaxValue = Math.max(safeNumber(max), 1);
+  const width = Math.min(100, Math.max((Math.abs(safeAmount) / safeMaxValue) * 100, safeAmount > 0 ? 4 : 0));
 
   return (
     <div className="grid gap-2">
       <div className="flex items-center justify-between gap-3">
         <span className={`text-sm ${strong ? "font-black text-ink" : "font-bold text-muted"}`}>{label}</span>
-        <span className="text-sm font-black text-ink">{formatCurrency(amount)}</span>
+        <span className="text-sm font-black text-ink">{formatCurrency(safeAmount)}</span>
       </div>
       <div className="h-4 overflow-hidden rounded-full bg-white ring-1 ring-line">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${width}%` }} />
@@ -381,10 +387,11 @@ function FinanceLineChart({ points, maxValue }: { points: Array<{ label: string;
   const padding = { top: 22, right: 20, bottom: 36, left: 54 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
-  const lineMax = Math.max(...points.flatMap((point) => [point.income, point.expenses, Math.abs(point.profit)]), maxValue, 1);
-  const incomePoints = buildPoints(points.map((point) => point.income), lineMax, chartWidth, chartHeight, padding);
-  const expensePoints = buildPoints(points.map((point) => point.expenses), lineMax, chartWidth, chartHeight, padding);
-  const profitPoints = buildPoints(points.map((point) => Math.max(point.profit, 0)), lineMax, chartWidth, chartHeight, padding);
+  const safePoints = points.length ? points : [{ label: "1", income: 0, expenses: 0, profit: 0 }];
+  const lineMax = safeMax([...safePoints.flatMap((point) => [point.income, point.expenses, Math.abs(point.profit)]), maxValue, 1]);
+  const incomePoints = buildPoints(safePoints.map((point) => point.income), lineMax, chartWidth, chartHeight, padding);
+  const expensePoints = buildPoints(safePoints.map((point) => point.expenses), lineMax, chartWidth, chartHeight, padding);
+  const profitPoints = buildPoints(safePoints.map((point) => Math.max(safeNumber(point.profit), 0)), lineMax, chartWidth, chartHeight, padding);
 
   return (
     <svg className="h-auto w-full rounded-xl bg-[#f8faf8] p-2 ring-1 ring-line" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Grafica financiera mensual">
@@ -416,18 +423,18 @@ function FinanceLineChart({ points, maxValue }: { points: Array<{ label: string;
       <polyline points={expensePoints} fill="none" stroke="#fb7185" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" filter="url(#financeGlow)" />
       <polyline points={profitPoints} fill="none" stroke="#335f82" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
       {incomePoints.split(" ").filter(Boolean).map((point, index) => {
-        if (index !== 0 && index !== points.length - 1 && index % 5 !== 0) return null;
+        if (index !== 0 && index !== safePoints.length - 1 && index % 5 !== 0) return null;
         const [x, y] = point.split(",").map(Number);
         return <circle key={`income-${index}`} cx={x} cy={y} r="4" fill="#10b981" stroke="#ffffff" strokeWidth="2" />;
       })}
       {expensePoints.split(" ").filter(Boolean).map((point, index) => {
-        if (index !== 0 && index !== points.length - 1 && index % 5 !== 0) return null;
+        if (index !== 0 && index !== safePoints.length - 1 && index % 5 !== 0) return null;
         const [x, y] = point.split(",").map(Number);
         return <circle key={`expense-${index}`} cx={x} cy={y} r="4" fill="#fb7185" stroke="#ffffff" strokeWidth="2" />;
       })}
-      {points.map((point, index) => {
-        if (index !== 0 && index !== points.length - 1 && index % 5 !== 0) return null;
-        const x = padding.left + (chartWidth / Math.max(points.length - 1, 1)) * index;
+      {safePoints.map((point, index) => {
+        if (index !== 0 && index !== safePoints.length - 1 && index % 5 !== 0) return null;
+        const x = padding.left + (chartWidth / Math.max(safePoints.length - 1, 1)) * index;
         return <text key={point.label} x={x} y={height - 12} textAnchor="middle" className="fill-muted text-[10px] font-bold">{point.label}</text>;
       })}
     </svg>
@@ -474,14 +481,17 @@ function Legend({ color, label }: { color: string; label: string }) {
 }
 
 function BarRow({ label, amount, max }: { label: string; amount: number; max: number }) {
+  const safeAmount = safeNumber(amount);
+  const safeMaxValue = Math.max(safeNumber(max), 1);
+
   return (
     <div className="grid gap-2">
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm font-black text-ink">{label}</span>
-        <span className="text-sm font-black text-ink">{formatCurrency(amount)}</span>
+        <span className="text-sm font-black text-ink">{formatCurrency(safeAmount)}</span>
       </div>
       <div className="h-3 overflow-hidden rounded-full bg-paper">
-        <div className="h-full rounded-full bg-moss" style={{ width: `${Math.max((amount / max) * 100, 4)}%` }} />
+        <div className="h-full rounded-full bg-moss" style={{ width: `${Math.min(100, Math.max((safeAmount / safeMaxValue) * 100, safeAmount > 0 ? 4 : 0))}%` }} />
       </div>
     </div>
   );
@@ -525,27 +535,38 @@ function Empty({ text }: { text: string }) {
 
 function buildPoints(values: number[], maxValue: number, width: number, height: number, padding: { top: number; left: number }) {
   const divisor = Math.max(values.length - 1, 1);
+  const safeMaxValue = Math.max(safeNumber(maxValue), 1);
 
   return values
     .map((value, index) => {
       const x = padding.left + (width / divisor) * index;
-      const y = padding.top + height - (Math.max(value, 0) / maxValue) * height;
+      const y = padding.top + height - (Math.max(safeNumber(value), 0) / safeMaxValue) * height;
       return `${x.toFixed(2)},${y.toFixed(2)}`;
     })
     .join(" ");
 }
 
 function buildAreaPath(points: string, baselineY: number) {
-  const splitPoints = points.split(" ");
+  const splitPoints = points.split(" ").filter(Boolean);
+  if (splitPoints.length === 0) return "";
   const first = splitPoints[0];
   const last = splitPoints[splitPoints.length - 1];
   const firstX = first.split(",")[0];
   const lastX = last.split(",")[0];
 
-  return `M ${firstX},${baselineY} L ${points.replaceAll(" ", " L ")} L ${lastX},${baselineY} Z`;
+  return `M ${firstX},${baselineY} L ${splitPoints.join(" L ")} L ${lastX},${baselineY} Z`;
 }
 
 function shortMoney(value: number) {
-  if (value >= 1000) return `${Math.round(value / 1000)}k`;
-  return `${Math.round(value)}`;
+  const safeValue = safeNumber(value);
+  if (safeValue >= 1000) return `${Math.round(safeValue / 1000)}k`;
+  return `${Math.round(safeValue)}`;
+}
+
+function safeNumber(value: number) {
+  return Number.isFinite(value) ? value : 0;
+}
+
+function safeMax(values: number[]) {
+  return Math.max(...values.map(safeNumber), 1);
 }

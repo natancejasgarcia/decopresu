@@ -89,10 +89,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     supabase.from("project_payments").select("project_id,amount,payment_date").returns<DashboardPayment[]>(),
   ]);
 
-  const dailyNotesTableMissing = dailyNotesError?.code === "42P01";
+  const projectReadsUnavailable = isOptionalDashboardError(projectReadsError);
+  const dismissedItemsUnavailable = isOptionalDashboardError(dismissedItemsError);
+  const dailyNotesUnavailable = isOptionalDashboardError(dailyNotesError);
   const paymentsTableMissing = paymentsError?.code === "42P01";
+  const paymentsUnavailable = isOptionalDashboardError(paymentsError);
 
-  if (error || allProjectsError || budgetItemsError || messagesError || projectReadsError || dismissedItemsError || (dailyNotesError && !dailyNotesTableMissing) || profilesError || (paymentsError && !paymentsTableMissing)) {
+  if (error || allProjectsError || budgetItemsError || messagesError || !projectReadsUnavailable && projectReadsError || !dismissedItemsUnavailable && dismissedItemsError || !dailyNotesUnavailable && dailyNotesError || profilesError || !paymentsUnavailable && paymentsError) {
     throw new Error(
       error?.message
         ?? allProjectsError?.message
@@ -113,9 +116,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const metricProjects = projectType === "Todos" ? (allProjects ?? []) : (allProjects ?? []).filter((project) => project.project_type === projectType);
   const metricProjectIds = new Set(metricProjects.map((project) => project.id));
   const metricBudgetItems = projectType === "Todos" ? (budgetItems ?? []) : (budgetItems ?? []).filter((item) => metricProjectIds.has(item.project_id));
-  const lastReadByProject = new Map((projectReads ?? []).map((read) => [read.project_id, new Date(read.last_read_at).getTime()]));
+  const safeProjectReads = projectReadsUnavailable ? [] : (projectReads ?? []);
+  const safeDismissedItems = dismissedItemsUnavailable ? [] : (dismissedItems ?? []);
+  const safePayments = paymentsUnavailable ? [] : (payments ?? []);
+  const lastReadByProject = new Map(safeProjectReads.map((read) => [read.project_id, new Date(read.last_read_at).getTime()]));
   const unreadByProject = new Map<string, number>();
-  const dismissedKeys = new Set((dismissedItems ?? []).map((item) => String(item.item_key)));
+  const dismissedKeys = new Set(safeDismissedItems.map((item) => String(item.item_key)));
 
   for (const message of messages ?? []) {
     if (message.user_id === user.id) {
@@ -129,7 +135,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   }
   const totalUnread = Array.from(unreadByProject.values()).reduce((sum, count) => sum + count, 0);
   const profileNames = new Map((profiles ?? []).map((item) => [item.user_id, item.name]));
-  const enrichedDailyNotes = (dailyNotesTableMissing ? [] : (dailyNotes ?? [])).map((note) => ({
+  const enrichedDailyNotes = (dailyNotesUnavailable ? [] : (dailyNotes ?? [])).map((note) => ({
     ...note,
     author_name: profileNames.get(note.created_by) ?? "Decoralia",
   }));
@@ -167,7 +173,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <DashboardStats
           projects={metricProjects}
           budgetItems={metricBudgetItems}
-          payments={paymentsTableMissing ? [] : (projectType === "Todos" ? (payments ?? []) : (payments ?? []).filter((payment) => metricProjectIds.has(payment.project_id)))}
+          payments={paymentsTableMissing || paymentsUnavailable ? [] : (projectType === "Todos" ? safePayments : safePayments.filter((payment) => metricProjectIds.has(payment.project_id)))}
           monthKey={chartMonth.key}
           month={chartMonth.month}
           year={chartMonth.year}
@@ -220,6 +226,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       </div>
     </main>
   );
+}
+
+function isOptionalDashboardError(error: { code?: string } | null) {
+  if (!error) return false;
+  return error.code === "42P01" || error.code === "42703" || error.code === "42501";
 }
 
 function buildTodayCards({

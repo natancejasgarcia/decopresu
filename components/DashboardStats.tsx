@@ -277,11 +277,12 @@ function LegendItem({ color, label, value }: { color: string; label: string; val
 }
 
 function StatusProjectDropdown({ row }: { row: ReturnType<typeof buildStatusRows>[number] }) {
+  const tone = STATUS_TONES[row.status] ?? { badge: "bg-slate-100 text-slate-700", dot: "bg-slate-400" };
   const header = (
     <div className="flex items-center justify-between gap-3">
       <div className="flex items-center gap-2">
-        <span className={`h-2.5 w-2.5 rounded-full ${STATUS_TONES[row.status].dot}`} />
-        <span className={`rounded-full px-3 py-1 text-xs font-black ${STATUS_TONES[row.status].badge}`}>{row.status}</span>
+        <span className={`h-2.5 w-2.5 rounded-full ${tone.dot}`} />
+        <span className={`rounded-full px-3 py-1 text-xs font-black ${tone.badge}`}>{row.status}</span>
       </div>
       <div className="text-right">
         <p className="text-sm font-black text-ink">{formatCurrency(row.amount)}</p>
@@ -392,34 +393,41 @@ function buildDashboardMonthHref({
 
 function buildLinePoints(values: number[], maxValue: number, width: number, height: number, padding: { top: number; left: number }) {
   const divisor = Math.max(values.length - 1, 1);
+  const safeMaxValue = Math.max(safeNumber(maxValue), 1);
 
   return values
     .map((value, index) => {
       const x = padding.left + (width / divisor) * index;
-      const y = padding.top + height - (Math.max(value, 0) / maxValue) * height;
+      const y = padding.top + height - (Math.max(safeNumber(value), 0) / safeMaxValue) * height;
       return `${x.toFixed(2)},${y.toFixed(2)}`;
     })
     .join(" ");
 }
 
 function buildAreaPath(points: string, baselineY: number) {
-  const splitPoints = points.split(" ");
+  const splitPoints = points.split(" ").filter(Boolean);
+  if (splitPoints.length === 0) return "";
   const first = splitPoints[0];
   const last = splitPoints[splitPoints.length - 1];
   const firstX = first.split(",")[0];
   const lastX = last.split(",")[0];
 
-  return `M ${firstX},${baselineY} L ${points.replaceAll(" ", " L ")} L ${lastX},${baselineY} Z`;
+  return `M ${firstX},${baselineY} L ${splitPoints.join(" L ")} L ${lastX},${baselineY} Z`;
 }
 
 function shortMoney(value: number) {
-  if (value >= 1000) {
-    return `${Math.round(value / 1000)}k`;
+  const safeValue = safeNumber(value);
+  if (safeValue >= 1000) {
+    return `${Math.round(safeValue / 1000)}k`;
   }
 
-  return `${Math.round(value)}`;
+  return `${Math.round(safeValue)}`;
 }
 
 function toDayKey(date: Date) {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+function safeNumber(value: number) {
+  return Number.isFinite(value) ? value : 0;
 }
