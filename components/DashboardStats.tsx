@@ -151,16 +151,7 @@ export function DashboardStats({ projects, budgetItems, monthKey, year, month, q
 
         <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {statusRows.map((row) => (
-            <div key={row.status} className="flex items-center justify-between rounded-lg border border-line bg-white px-3 py-2">
-              <div className="flex items-center gap-2">
-                <span className={`h-2.5 w-2.5 rounded-full ${STATUS_TONES[row.status].dot}`} />
-                <span className={`rounded-full px-3 py-1 text-xs font-black ${STATUS_TONES[row.status].badge}`}>{row.status}</span>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-black text-ink">{formatCurrency(row.amount)}</p>
-                <p className="text-xs font-bold text-muted">{row.count} obras</p>
-              </div>
-            </div>
+            <StatusProjectDropdown key={row.status} row={row} />
           ))}
         </div>
       </div>
@@ -278,23 +269,84 @@ function LegendItem({ color, label, value }: { color: string; label: string; val
   );
 }
 
+function StatusProjectDropdown({ row }: { row: ReturnType<typeof buildStatusRows>[number] }) {
+  const header = (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <span className={`h-2.5 w-2.5 rounded-full ${STATUS_TONES[row.status].dot}`} />
+        <span className={`rounded-full px-3 py-1 text-xs font-black ${STATUS_TONES[row.status].badge}`}>{row.status}</span>
+      </div>
+      <div className="text-right">
+        <p className="text-sm font-black text-ink">{formatCurrency(row.amount)}</p>
+        <p className="text-xs font-bold text-muted">{row.count} obras</p>
+      </div>
+    </div>
+  );
+
+  if (row.count === 0) {
+    return (
+      <div className="rounded-lg border border-line bg-white px-3 py-2">
+        {header}
+      </div>
+    );
+  }
+
+  return (
+    <details className="group rounded-lg border border-line bg-white px-3 py-2">
+      <summary className="cursor-pointer list-none">
+        {header}
+        <span className="mt-2 block text-xs font-black text-moss group-open:hidden">Tocar para ver obras</span>
+        <span className="mt-2 hidden text-xs font-black text-moss group-open:block">Ocultar obras</span>
+      </summary>
+      <div className="mt-3 grid gap-2 border-t border-line pt-3">
+        {row.projects.map((project) => (
+          <Link key={project.id} href={`/projects/${project.id}`} className="rounded-lg bg-paper p-3 hover:ring-1 hover:ring-moss">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <strong className="block text-sm text-ink">{project.name}</strong>
+                <span className="mt-1 block text-xs font-semibold text-muted">{project.clientName}</span>
+              </div>
+              <span className="whitespace-nowrap text-sm font-black text-ink">{formatCurrency(project.amount)}</span>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 function buildStatusRows(projects: Project[], totalsByProject: Map<string, number>) {
-  const rows = new Map<ProjectStatus, { status: ProjectStatus; count: number; amount: number }>();
+  const rows = new Map<ProjectStatus, { status: ProjectStatus; count: number; amount: number; projects: Array<{ id: string; name: string; clientName: string; amount: number }> }>();
 
   for (const status of PROJECT_STATUSES) {
-    rows.set(status, { status, count: 0, amount: 0 });
+    rows.set(status, { status, count: 0, amount: 0, projects: [] });
   }
 
   for (const project of projects) {
-    const current = rows.get(project.status) ?? { status: project.status, count: 0, amount: 0 };
+    const current = rows.get(project.status) ?? { status: project.status, count: 0, amount: 0, projects: [] };
+    const amount = totalsByProject.get(project.id) ?? 0;
     rows.set(project.status, {
       status: project.status,
       count: current.count + 1,
-      amount: current.amount + (totalsByProject.get(project.id) ?? 0),
+      amount: current.amount + amount,
+      projects: [
+        ...current.projects,
+        {
+          id: project.id,
+          name: project.name,
+          clientName: project.client_name,
+          amount,
+        },
+      ],
     });
   }
 
-  return Array.from(rows.values()).sort((a, b) => b.amount - a.amount);
+  return Array.from(rows.values())
+    .map((row) => ({
+      ...row,
+      projects: row.projects.sort((a, b) => b.amount - a.amount),
+    }))
+    .sort((a, b) => b.amount - a.amount);
 }
 
 function buildMonthDays(year: number, month: number): ChartDay[] {
