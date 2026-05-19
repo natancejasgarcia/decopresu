@@ -41,6 +41,11 @@ function currentDateValue() {
   return new Date().toISOString().slice(0, 10);
 }
 
+type FinanceActionResult = {
+  ok: boolean;
+  error?: string;
+};
+
 export async function createExpenseAction(formData: FormData) {
   const { supabase, user } = await requireUserProfile();
   const parsed = expenseSchema.safeParse({
@@ -83,23 +88,23 @@ export async function deleteExpenseAction(formData: FormData) {
   revalidatePath("/finance");
 }
 
-export async function createPaymentAction(formData: FormData) {
+export async function createPaymentAction(formData: FormData): Promise<FinanceActionResult> {
   const { supabase, user } = await requireUserProfile();
   const parsed = paymentSchema.safeParse({
     ...Object.fromEntries(formData),
     payment_date: formData.get("payment_date") || currentDateValue(),
   });
 
-  if (!parsed.success) return;
-  const receiptData = await uploadPaymentReceipt(supabase, parsed.data.project_id, formData.get("receipt"));
+  if (!parsed.success) return actionError("Revisa los datos del cobro.");
 
-  const { error } = await supabase.from("project_payments").insert({
+  const { data: payment, error } = await supabase.from("project_payments").insert({
     ...parsed.data,
-    ...receiptData,
     created_by: user.id,
-  });
+  }).select("id, project_id").single<{ id: string; project_id: string | null }>();
 
-  if (error) throw new Error(error.message);
+  if (error) return actionError(friendlyFinanceError(error.message));
+
+  const receiptResult = await attachPaymentReceipt(supabase, payment.id, parsed.data.project_id, formData.get("receipt"));
 
   if (parsed.data.project_id) {
     await touchProject(supabase, parsed.data.project_id);
@@ -107,9 +112,22 @@ export async function createPaymentAction(formData: FormData) {
   }
   revalidatePath("/dashboard");
   revalidatePath("/finance");
+
+  if (!receiptResult.ok) {
+    return {
+      ok: false,
+      error: `El cobro se guardó, pero el PDF no: ${receiptResult.error}`,
+    };
+  }
+
+  return { ok: true };
 }
 
-export async function updatePaymentAction(formData: FormData) {
+export async function createPaymentFormAction(formData: FormData): Promise<void> {
+  await createPaymentAction(formData);
+}
+
+export async function updatePaymentAction(formData: FormData): Promise<FinanceActionResult> {
   const { supabase } = await requireUserProfile();
   const paymentId = z.string().uuid().parse(formData.get("payment_id"));
   const parsed = paymentSchema.safeParse({
@@ -117,8 +135,7 @@ export async function updatePaymentAction(formData: FormData) {
     payment_date: formData.get("payment_date") || currentDateValue(),
   });
 
-  if (!parsed.success) return;
-  const receiptData = await uploadPaymentReceipt(supabase, parsed.data.project_id, formData.get("receipt"));
+  if (!parsed.success) return actionError("Revisa los datos del cobro.");
 
   const { error } = await supabase
     .from("project_payments")
@@ -127,11 +144,12 @@ export async function updatePaymentAction(formData: FormData) {
       payment_date: parsed.data.payment_date,
       method: parsed.data.method,
       notes: parsed.data.notes,
-      ...receiptData,
     })
     .eq("id", paymentId);
 
-  if (error) throw new Error(error.message);
+  if (error) return actionError(friendlyFinanceError(error.message));
+
+  const receiptResult = await attachPaymentReceipt(supabase, paymentId, parsed.data.project_id, formData.get("receipt"));
 
   if (parsed.data.project_id) {
     await touchProject(supabase, parsed.data.project_id);
@@ -139,6 +157,15 @@ export async function updatePaymentAction(formData: FormData) {
   }
   revalidatePath("/dashboard");
   revalidatePath("/finance");
+
+  if (!receiptResult.ok) {
+    return {
+      ok: false,
+      error: `El cobro se guardó, pero el PDF no: ${receiptResult.error}`,
+    };
+  }
+
+  return { ok: true };
 }
 
 export async function deletePaymentAction(formData: FormData) {
@@ -197,14 +224,14 @@ async function uploadPaymentReceipt(
   projectId: string | null,
   value: FormDataEntryValue | null,
 ) {
-  if (!isUploadedFile(value)) return {};
+  if (!isUploadedFile(value)) return { ok: true, data: null };
 
   if (value.size > MAX_RECEIPT_FILE_SIZE) {
-    throw new Error("El PDF supera el limite de 10 MB.");
+    return { ok: false, error: "el PDF supera el limite de 10 MB." };
   }
 
   if (value.type !== "application/pdf" && !value.name.toLowerCase().endsWith(".pdf")) {
-    throw new Error("El justificante tiene que ser un PDF.");
+    return { ok: false, error: "el justificante tiene que ser un PDF." };
   }
 
   const safeName = value.name.replace(/[^a-zA-Z0-9._-]/g, "-");
@@ -216,16 +243,68 @@ async function uploadPaymentReceipt(
   });
 
   if (error) {
-    throw new Error(error.message);
+    return { ok: false, error: friendlyFinanceError(error.message) };
   }
 
   return {
-    receipt_file_name: value.name,
-    receipt_file_url: path,
-    receipt_file_type: value.type || "application/pdf",
+    ok: true,
+    data: {
+      receipt_file_name: value.name,
+      receipt_file_url: path,
+      receipt_file_type: value.type || "application/pdf",
+    },
   };
 }
 
 function isUploadedFile(value: FormDataEntryValue | null): value is File {
   return typeof File !== "undefined" && value instanceof File && value.size > 0;
+}
+
+async function attachPaymentReceipt(
+  supabase: Awaited<ReturnType<typeof requireUserProfile>>["supabase"],
+  paymentId: string,
+  projectId: string | null,
+  value: FormDataEntryValue | null,
+): Promise<FinanceActionResult> {
+  const receiptResult = await uploadPaymentReceipt(supabase, projectId, value);
+
+  if (!receiptResult.ok) {
+    return { ok: false, error: receiptResult.error };
+  }
+
+  if (!receiptResult.data) {
+    return { ok: true };
+  }
+
+  const { error } = await supabase
+    .from("project_payments")
+    .update(receiptResult.data)
+    .eq("id", paymentId);
+
+  if (error) {
+    return { ok: false, error: friendlyFinanceError(error.message) };
+  }
+
+  return { ok: true };
+}
+
+function actionError(error: string): FinanceActionResult {
+  console.error("[finance-action]", error);
+  return { ok: false, error };
+}
+
+function friendlyFinanceError(message: string) {
+  if (message.includes("receipt_file")) {
+    return "faltan las columnas del PDF en Supabase. Ejecuta la migración 20260519_payment_receipts.sql.";
+  }
+
+  if (message.toLowerCase().includes("row-level security") || message.toLowerCase().includes("policy")) {
+    return "Supabase ha bloqueado el permiso. Revisa que estén ejecutadas las políticas de Storage y Finanzas.";
+  }
+
+  if (message.toLowerCase().includes("not-null") && message.includes("project_id")) {
+    return "Supabase aún obliga a elegir una obra. Ejecuta la migración 20260519_optional_payment_project.sql.";
+  }
+
+  return message;
 }

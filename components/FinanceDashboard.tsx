@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BarChart3, Banknote, CreditCard, Euro, ReceiptText, Trash2, TrendingDown, TrendingUp, WalletCards } from "lucide-react";
-import { createExpenseAction, createFixedCostAction, createPaymentAction, deleteExpenseAction, deleteFixedCostAction, deletePaymentAction } from "@/actions/financeActions";
+import { createExpenseAction, createFixedCostAction, createPaymentFormAction, deleteExpenseAction, deleteFixedCostAction, deletePaymentAction } from "@/actions/financeActions";
 import { formatCurrency } from "@/lib/calculations";
 import { buildDailyFinanceSeries, buildMonthlyFinance, monthLabel, monthlyFixedCostAmount } from "@/lib/finance";
 import {
@@ -143,7 +143,7 @@ export function FinanceDashboard({ projects, budgetItems, expenses, payments, fi
           </FinanceFormPanel>
 
           <FinanceFormPanel title="Registrar cobro" icon={<CreditCard size={18} />}>
-            <form action={createPaymentAction} encType="multipart/form-data" className="grid gap-3">
+            <form action={createPaymentFormAction} encType="multipart/form-data" className="grid gap-3">
               <Field label="Proyecto">
                 <select className="form-input" name="project_id" defaultValue="">
                   <option value="">Cobro vario</option>

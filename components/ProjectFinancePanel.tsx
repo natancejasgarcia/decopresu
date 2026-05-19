@@ -53,7 +53,11 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
 
     startTransition(async () => {
       try {
-        await createPaymentAction(formData);
+        const result = await createPaymentAction(formData);
+        if (!result.ok) {
+          setErrorMessage(result.error ?? "No se pudo guardar el cobro.");
+          return;
+        }
         form.reset();
         router.refresh();
       } catch (error) {
@@ -102,7 +106,11 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
 
     startTransition(async () => {
       try {
-        await updatePaymentAction(formData);
+        const result = await updatePaymentAction(formData);
+        if (!result.ok) {
+          setErrorMessage(result.error ?? "No se pudo guardar el cobro.");
+          return;
+        }
         setEditingPaymentId(null);
         router.refresh();
       } catch (error) {
