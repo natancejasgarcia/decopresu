@@ -133,21 +133,6 @@ export default async function PrintBudgetPage({ params }: PrintBudgetPageProps) 
         </section>
 
         <section className="mt-8">
-          <h2 className="border-b border-[#d8ddd8] pb-2 text-[14px] font-black uppercase tracking-wide text-[#152630]">
-            Trabajos a realizar
-          </h2>
-          <h3 className="mt-4 text-[15px] font-black text-[#152630]">{project.name}</h3>
-          <p className="mt-3 whitespace-pre-wrap text-[13px] leading-6 text-[#303c44]">{project.description}</p>
-          <p className="mt-4 text-[13px] font-black text-[#152630]">Trabajos incluidos:</p>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-[13px] leading-6 text-[#303c44]">
-            <li>Preparación de superficies.</li>
-            <li>Protección de zonas de trabajo.</li>
-            <li>Aplicación de los materiales correspondientes.</li>
-            <li>Limpieza básica final de la zona de trabajo.</li>
-          </ul>
-        </section>
-
-        <section className="mt-8">
           <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr className="bg-[#152630] text-left text-white">

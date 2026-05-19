@@ -93,28 +93,6 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
   return lines;
 }
 
-function drawWrapped(
-  page: PDFPage,
-  text: string,
-  x: number,
-  y: number,
-  maxWidth: number,
-  font: PDFFont,
-  size: number,
-  lineHeight: number,
-  color = INK,
-) {
-  const lines = wrapText(text, font, size, maxWidth);
-  let nextY = y;
-  for (const line of lines) {
-    if (line) {
-      page.drawText(line, { x, y: nextY, size, font, color });
-    }
-    nextY -= lineHeight;
-  }
-  return nextY;
-}
-
 function drawLabelValue(page: PDFPage, label: string, value: string, x: number, y: number, fonts: Fonts) {
   page.drawText(label, { x, y, size: 7.5, font: fonts.bold, color: MUTED });
   page.drawText(value || "-", { x, y: y - 11, size: 9, font: fonts.bold, color: INK });
@@ -229,23 +207,6 @@ export async function GET(_request: NextRequest, { params }: Context) {
   drawLabelValue(page, "EMAIL", project.client_email || "-", MARGIN + colW + 14, y - 34, fonts);
 
   y -= 80;
-  y = sectionTitle(page, "Trabajos a realizar", y, fonts);
-  page.drawText(project.name, { x: MARGIN, y, size: 10, font: fonts.bold, color: INK });
-  y = drawWrapped(page, project.description, MARGIN, y - 15, PAGE_WIDTH - MARGIN * 2, fonts.regular, 8, 11, INK);
-  y -= 4;
-  y = drawWrapped(
-    page,
-    "Trabajos incluidos: preparación de superficies, protección de zonas de trabajo, aplicación de los materiales correspondientes y limpieza básica final.",
-    MARGIN,
-    y,
-    PAGE_WIDTH - MARGIN * 2,
-    fonts.regular,
-    8,
-    11,
-    MUTED,
-  );
-
-  y -= 14;
   ({ page, y } = ensurePage(pdf, page, y, 80));
   y = sectionTitle(page, "Conceptos del presupuesto", y, fonts);
   const conceptHeaders = [
