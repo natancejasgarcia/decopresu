@@ -27,7 +27,7 @@ type DashboardBudgetItem = {
 };
 
 type DashboardPayment = {
-  project_id: string;
+  project_id: string | null;
   amount: number;
   payment_date: string;
 };
@@ -173,7 +173,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <DashboardStats
           projects={metricProjects}
           budgetItems={metricBudgetItems}
-          payments={paymentsTableMissing || paymentsUnavailable ? [] : (projectType === "Todos" ? safePayments : safePayments.filter((payment) => metricProjectIds.has(payment.project_id)))}
+          payments={paymentsTableMissing || paymentsUnavailable ? [] : (projectType === "Todos" ? safePayments : safePayments.filter((payment) => payment.project_id ? metricProjectIds.has(payment.project_id) : false))}
           monthKey={chartMonth.key}
           month={chartMonth.month}
           year={chartMonth.year}

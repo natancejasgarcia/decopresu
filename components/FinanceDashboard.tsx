@@ -145,7 +145,8 @@ export function FinanceDashboard({ projects, budgetItems, expenses, payments, fi
           <FinanceFormPanel title="Registrar cobro" icon={<CreditCard size={18} />}>
             <form action={createPaymentAction} encType="multipart/form-data" className="grid gap-3">
               <Field label="Proyecto">
-                <select className="form-input" name="project_id" required>
+                <select className="form-input" name="project_id" defaultValue="">
+                  <option value="">Cobro vario</option>
                   {projects.map((project) => (
                     <option key={project.id} value={project.id}>{project.name}</option>
                   ))}
@@ -276,11 +277,11 @@ export function FinanceDashboard({ projects, budgetItems, expenses, payments, fi
           {finance.monthPayments.length === 0 ? <Empty text="No hay cobros este mes." /> : finance.monthPayments.slice(0, 8).map((payment) => (
             <FinanceRow
               key={payment.id}
-              title={projectNames.get(payment.project_id) ?? "Proyecto"}
+              title={projectNames.get(payment.project_id ?? "") ?? "Cobro vario"}
               meta={`${payment.method} - ${payment.payment_date}`}
               amount={Number(payment.amount)}
               deleteAction={deletePaymentAction}
-              hiddenInputs={{ payment_id: payment.id, project_id: payment.project_id }}
+              hiddenInputs={{ payment_id: payment.id, project_id: payment.project_id ?? "" }}
               receiptName={payment.receipt_file_name}
               receiptUrl={payment.receipt_signed_url}
             />

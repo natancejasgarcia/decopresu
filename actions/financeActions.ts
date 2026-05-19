@@ -21,7 +21,7 @@ const expenseSchema = z.object({
 });
 
 const paymentSchema = z.object({
-  project_id: z.string().uuid(),
+  project_id: optionalUuid,
   amount: z.coerce.number().min(0),
   payment_date: z.string().min(8),
   method: z.enum(PAYMENT_METHODS as [string, ...string[]]),
@@ -101,8 +101,10 @@ export async function createPaymentAction(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
-  await touchProject(supabase, parsed.data.project_id);
-  revalidatePath(`/projects/${parsed.data.project_id}`);
+  if (parsed.data.project_id) {
+    await touchProject(supabase, parsed.data.project_id);
+    revalidatePath(`/projects/${parsed.data.project_id}`);
+  }
   revalidatePath("/dashboard");
   revalidatePath("/finance");
 }
@@ -127,13 +129,14 @@ export async function updatePaymentAction(formData: FormData) {
       notes: parsed.data.notes,
       ...receiptData,
     })
-    .eq("id", paymentId)
-    .eq("project_id", parsed.data.project_id);
+    .eq("id", paymentId);
 
   if (error) throw new Error(error.message);
 
-  await touchProject(supabase, parsed.data.project_id);
-  revalidatePath(`/projects/${parsed.data.project_id}`);
+  if (parsed.data.project_id) {
+    await touchProject(supabase, parsed.data.project_id);
+    revalidatePath(`/projects/${parsed.data.project_id}`);
+  }
   revalidatePath("/dashboard");
   revalidatePath("/finance");
 }
@@ -141,14 +144,17 @@ export async function updatePaymentAction(formData: FormData) {
 export async function deletePaymentAction(formData: FormData) {
   const { supabase } = await requireUserProfile();
   const paymentId = z.string().uuid().parse(formData.get("payment_id"));
-  const projectId = z.string().uuid().parse(formData.get("project_id"));
+  const projectId = optionalUuid.parse(formData.get("project_id"));
 
-  const { error } = await supabase.from("project_payments").delete().eq("id", paymentId).eq("project_id", projectId);
+  const { error } = await supabase.from("project_payments").delete().eq("id", paymentId);
 
   if (error) throw new Error(error.message);
 
-  await touchProject(supabase, projectId);
-  revalidatePath(`/projects/${projectId}`);
+  if (projectId) {
+    await touchProject(supabase, projectId);
+    revalidatePath(`/projects/${projectId}`);
+  }
+  revalidatePath("/dashboard");
   revalidatePath("/finance");
 }
 
@@ -188,7 +194,7 @@ async function touchProject(supabase: Awaited<ReturnType<typeof requireUserProfi
 
 async function uploadPaymentReceipt(
   supabase: Awaited<ReturnType<typeof requireUserProfile>>["supabase"],
-  projectId: string,
+  projectId: string | null,
   value: FormDataEntryValue | null,
 ) {
   if (!isUploadedFile(value)) return {};
@@ -202,7 +208,8 @@ async function uploadPaymentReceipt(
   }
 
   const safeName = value.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-  const path = `${projectId}/payments/${crypto.randomUUID()}-${safeName}`;
+  const folder = projectId ?? "cobros-varios";
+  const path = `${folder}/payments/${crypto.randomUUID()}-${safeName}`;
   const { error } = await supabase.storage.from("project-files").upload(path, value, {
     contentType: value.type || "application/pdf",
     upsert: false,

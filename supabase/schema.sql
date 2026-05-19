@@ -150,7 +150,7 @@ create table if not exists public.project_expenses (
 
 create table if not exists public.project_payments (
   id uuid primary key default gen_random_uuid(),
-  project_id uuid not null references public.projects(id) on delete cascade,
+  project_id uuid references public.projects(id) on delete cascade,
   amount numeric(10, 2) not null default 0 check (amount >= 0),
   payment_date date not null default current_date,
   method text not null default 'Transferencia' check (method in ('Transferencia', 'Efectivo', 'Bizum', 'Tarjeta', 'Otro')),

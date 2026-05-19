@@ -158,7 +158,7 @@ export type ProjectExpense = {
 
 export type ProjectPayment = {
   id: string;
-  project_id: string;
+  project_id: string | null;
   amount: number;
   payment_date: string;
   method: PaymentMethod;

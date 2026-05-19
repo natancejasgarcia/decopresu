@@ -24,7 +24,7 @@ type DashboardStatsProps = {
 };
 
 type ProjectPaymentSummary = {
-  project_id: string;
+  project_id: string | null;
   amount: number;
   payment_date: string;
 };

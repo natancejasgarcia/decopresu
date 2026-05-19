@@ -72,11 +72,12 @@ export function buildMonthlyFinance({
     .reduce((sum, project) => sum + (budgetTotals.get(project.id) ?? 0), 0);
   const monthPayments = payments.filter((payment) => isInMonth(payment.payment_date, year, month));
   const collectedAmount = monthPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+  const linkedCollectedAmount = monthPayments.filter((payment) => payment.project_id).reduce((sum, payment) => sum + Number(payment.amount), 0);
   const monthExpenses = expenses.filter((expense) => isInMonth(expense.expense_date, year, month));
   const expenseAmount = monthExpenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
   const fixedCostAmount = fixedCosts.filter((cost) => cost.is_active).reduce((sum, cost) => sum + monthlyFixedCostAmount(cost), 0);
   const profit = collectedAmount - expenseAmount - fixedCostAmount;
-  const pendingCollection = Math.max(approvedAmount - collectedAmount, 0);
+  const pendingCollection = Math.max(approvedAmount - linkedCollectedAmount, 0);
 
   return {
     budgetTotals,
