@@ -198,6 +198,10 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
             <input className="form-input" id="payment-date" name="payment_date" type="date" defaultValue={todayValue()} />
           </div>
           <textarea className="form-input min-h-20" name="notes" placeholder="Transferencia, senal, pago final..." />
+          <div>
+            <label className="form-label" htmlFor="payment-receipt">PDF justificante</label>
+            <input className="form-input file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-black file:text-white" id="payment-receipt" name="receipt" type="file" accept="application/pdf,.pdf" />
+          </div>
           <button className="h-11 rounded-lg bg-moss font-black text-white disabled:opacity-60" disabled={isPending}>Guardar cobro</button>
         </form>
       </div>
@@ -310,6 +314,15 @@ function FinanceList({
                         </div>
                       </div>
                       <textarea className="form-input min-h-20" name="notes" defaultValue={row.notes ?? ""} placeholder="Notas del cobro..." />
+                      <div>
+                        <label className="form-label" htmlFor={`payment-edit-receipt-${row.id}`}>Nuevo PDF justificante</label>
+                        <input className="form-input file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-black file:text-white" id={`payment-edit-receipt-${row.id}`} name="receipt" type="file" accept="application/pdf,.pdf" />
+                        {row.receipt_signed_url ? (
+                          <a className="mt-2 inline-flex text-xs font-black text-moss underline" href={row.receipt_signed_url} target="_blank" rel="noreferrer">
+                            Ver PDF actual
+                          </a>
+                        ) : null}
+                      </div>
                       <div className="flex flex-col gap-2 sm:flex-row">
                         <button className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-moss px-4 text-sm font-black text-white disabled:opacity-60" disabled={isPending}>
                           <Save size={17} />
@@ -327,6 +340,11 @@ function FinanceList({
                         <strong className="block text-sm text-ink">{row.method}</strong>
                         <p className="text-xs font-semibold text-muted">{row.payment_date}</p>
                         {row.notes ? <p className="mt-1 text-sm text-muted">{row.notes}</p> : null}
+                        {row.receipt_signed_url ? (
+                          <a className="mt-1 inline-flex text-xs font-black text-moss underline" href={row.receipt_signed_url} target="_blank" rel="noreferrer">
+                            Ver PDF {row.receipt_file_name ? `- ${row.receipt_file_name}` : ""}
+                          </a>
+                        ) : null}
                       </div>
                       <strong className="whitespace-nowrap text-ink">{formatCurrency(Number(row.amount))}</strong>
                       <button className="grid h-10 w-10 place-items-center rounded-lg border border-line text-ink disabled:opacity-50" disabled={isPending} onClick={() => setEditingPaymentId?.(row.id)} title="Editar cobro" type="button">

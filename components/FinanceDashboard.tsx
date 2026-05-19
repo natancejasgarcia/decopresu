@@ -143,7 +143,7 @@ export function FinanceDashboard({ projects, budgetItems, expenses, payments, fi
           </FinanceFormPanel>
 
           <FinanceFormPanel title="Registrar cobro" icon={<CreditCard size={18} />}>
-            <form action={createPaymentAction} className="grid gap-3">
+            <form action={createPaymentAction} encType="multipart/form-data" className="grid gap-3">
               <Field label="Proyecto">
                 <select className="form-input" name="project_id" required>
                   {projects.map((project) => (
@@ -167,6 +167,9 @@ export function FinanceDashboard({ projects, budgetItems, expenses, payments, fi
                 </Field>
               </div>
               <textarea className="form-input min-h-20" name="notes" placeholder="Senal, pago final, transferencia..." />
+              <Field label="PDF justificante">
+                <input className="form-input file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-black file:text-white" name="receipt" type="file" accept="application/pdf,.pdf" />
+              </Field>
               <button className="h-11 rounded-lg bg-moss font-black text-white">Guardar cobro</button>
             </form>
           </FinanceFormPanel>
@@ -278,6 +281,8 @@ export function FinanceDashboard({ projects, budgetItems, expenses, payments, fi
               amount={Number(payment.amount)}
               deleteAction={deletePaymentAction}
               hiddenInputs={{ payment_id: payment.id, project_id: payment.project_id }}
+              receiptName={payment.receipt_file_name}
+              receiptUrl={payment.receipt_signed_url}
             />
           ))}
         </DataPanel>
@@ -503,18 +508,27 @@ function FinanceRow({
   amount,
   deleteAction,
   hiddenInputs,
+  receiptName,
+  receiptUrl,
 }: {
   title: string;
   meta: string;
   amount: number;
   deleteAction: (formData: FormData) => Promise<void>;
   hiddenInputs: Record<string, string>;
+  receiptName?: string | null;
+  receiptUrl?: string;
 }) {
   return (
     <article className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-line p-3">
       <div>
         <strong className="block text-sm text-ink">{title}</strong>
         <p className="text-xs font-semibold text-muted">{meta}</p>
+        {receiptUrl ? (
+          <a className="mt-1 inline-flex text-xs font-black text-moss underline" href={receiptUrl} target="_blank" rel="noreferrer">
+            Ver PDF {receiptName ? `- ${receiptName}` : ""}
+          </a>
+        ) : null}
       </div>
       <strong className="whitespace-nowrap text-ink">{formatCurrency(amount)}</strong>
       <form action={deleteAction}>

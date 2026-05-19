@@ -41,6 +41,8 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
     throw new Error(expensesError?.message ?? paymentsError?.message ?? fixedCostsError?.message);
   }
 
+  const paymentsWithSignedReceipts = await signPaymentReceipts(supabase, financeTablesUnavailable ? [] : (payments ?? []));
+
   return (
     <main className="min-h-screen pb-24">
       <TopBar profile={profile} />
@@ -49,7 +51,7 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
           projects={projects ?? []}
           budgetItems={sortBudgetItems(budgetItems ?? [])}
           expenses={financeTablesUnavailable ? [] : (expenses ?? [])}
-          payments={financeTablesUnavailable ? [] : (payments ?? [])}
+          payments={paymentsWithSignedReceipts}
           fixedCosts={financeTablesUnavailable ? [] : (fixedCosts ?? [])}
           year={year}
           month={month}
@@ -63,4 +65,18 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
 function isOptionalFinanceError(error: { code?: string } | null) {
   if (!error) return false;
   return error.code === "42P01" || error.code === "42703" || error.code === "42501";
+}
+
+async function signPaymentReceipts(
+  supabase: Awaited<ReturnType<typeof requireUserProfile>>["supabase"],
+  payments: ProjectPayment[],
+) {
+  return Promise.all(
+    payments.map(async (payment) => {
+      if (!payment.receipt_file_url) return payment;
+
+      const { data } = await supabase.storage.from("project-files").createSignedUrl(payment.receipt_file_url, 60 * 60);
+      return { ...payment, receipt_signed_url: data?.signedUrl };
+    }),
+  );
 }

@@ -155,6 +155,9 @@ create table if not exists public.project_payments (
   payment_date date not null default current_date,
   method text not null default 'Transferencia' check (method in ('Transferencia', 'Efectivo', 'Bizum', 'Tarjeta', 'Otro')),
   notes text,
+  receipt_file_name text,
+  receipt_file_url text,
+  receipt_file_type text,
   created_by uuid not null references public.profiles(user_id) on delete cascade,
   created_at timestamptz not null default now()
 );

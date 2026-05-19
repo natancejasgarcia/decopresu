@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireUserProfile } from "@/lib/auth";
 import { EXPENSE_CATEGORIES, FIXED_COST_FREQUENCIES, PAYMENT_METHODS } from "@/lib/types";
 
+const MAX_RECEIPT_FILE_SIZE = 10 * 1024 * 1024;
 const optionalUuid = z.preprocess((value) => (value === "" || value === null ? null : value), z.string().uuid().nullable());
 const optionalText = z.preprocess((value) => (typeof value === "string" && value.trim() ? value.trim() : null), z.string().nullable());
 
@@ -90,9 +91,11 @@ export async function createPaymentAction(formData: FormData) {
   });
 
   if (!parsed.success) return;
+  const receiptData = await uploadPaymentReceipt(supabase, parsed.data.project_id, formData.get("receipt"));
 
   const { error } = await supabase.from("project_payments").insert({
     ...parsed.data,
+    ...receiptData,
     created_by: user.id,
   });
 
@@ -113,6 +116,7 @@ export async function updatePaymentAction(formData: FormData) {
   });
 
   if (!parsed.success) return;
+  const receiptData = await uploadPaymentReceipt(supabase, parsed.data.project_id, formData.get("receipt"));
 
   const { error } = await supabase
     .from("project_payments")
@@ -121,6 +125,7 @@ export async function updatePaymentAction(formData: FormData) {
       payment_date: parsed.data.payment_date,
       method: parsed.data.method,
       notes: parsed.data.notes,
+      ...receiptData,
     })
     .eq("id", paymentId)
     .eq("project_id", parsed.data.project_id);
@@ -179,4 +184,41 @@ async function touchProject(supabase: Awaited<ReturnType<typeof requireUserProfi
     .from("projects")
     .update({ last_activity_at: new Date().toISOString() })
     .eq("id", projectId);
+}
+
+async function uploadPaymentReceipt(
+  supabase: Awaited<ReturnType<typeof requireUserProfile>>["supabase"],
+  projectId: string,
+  value: FormDataEntryValue | null,
+) {
+  if (!isUploadedFile(value)) return {};
+
+  if (value.size > MAX_RECEIPT_FILE_SIZE) {
+    throw new Error("El PDF supera el limite de 10 MB.");
+  }
+
+  if (value.type !== "application/pdf" && !value.name.toLowerCase().endsWith(".pdf")) {
+    throw new Error("El justificante tiene que ser un PDF.");
+  }
+
+  const safeName = value.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+  const path = `${projectId}/payments/${crypto.randomUUID()}-${safeName}`;
+  const { error } = await supabase.storage.from("project-files").upload(path, value, {
+    contentType: value.type || "application/pdf",
+    upsert: false,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return {
+    receipt_file_name: value.name,
+    receipt_file_url: path,
+    receipt_file_type: value.type || "application/pdf",
+  };
+}
+
+function isUploadedFile(value: FormDataEntryValue | null): value is File {
+  return typeof File !== "undefined" && value instanceof File && value.size > 0;
 }

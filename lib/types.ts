@@ -163,6 +163,10 @@ export type ProjectPayment = {
   payment_date: string;
   method: PaymentMethod;
   notes: string | null;
+  receipt_file_name: string | null;
+  receipt_file_url: string | null;
+  receipt_file_type: string | null;
+  receipt_signed_url?: string;
   created_by: string;
   created_at: string;
 };
