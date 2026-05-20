@@ -7,8 +7,7 @@ import { requireUserProfile } from "@/lib/auth";
 const MAX_VALIDATION_FILE_SIZE = 15 * 1024 * 1024;
 
 const createValidationSchema = z.object({
-  name: z.string().trim().min(2),
-  project_id: z.preprocess((value) => (value === "" || value === null ? null : value), z.string().uuid().nullable()),
+  project_id: z.string().uuid(),
 });
 
 export async function createBudgetValidationAction(formData: FormData) {
@@ -21,8 +20,19 @@ export async function createBudgetValidationAction(formData: FormData) {
   if (file.size > MAX_VALIDATION_FILE_SIZE) return;
   if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) return;
 
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("name")
+    .eq("id", parsed.data.project_id)
+    .single<{ name: string }>();
+
+  if (projectError || !project) {
+    console.error("[budget-validation-project]", projectError?.message ?? "Proyecto no encontrado");
+    return;
+  }
+
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-  const path = `budget-validations/${crypto.randomUUID()}-${safeName}`;
+  const path = `${parsed.data.project_id}/budget-validations/${crypto.randomUUID()}-${safeName}`;
   const { error: uploadError } = await supabase.storage.from("project-files").upload(path, file, {
     contentType: file.type || "application/pdf",
     upsert: false,
@@ -35,7 +45,7 @@ export async function createBudgetValidationAction(formData: FormData) {
 
   const { error } = await supabase.from("budget_validations").insert({
     project_id: parsed.data.project_id,
-    name: parsed.data.name,
+    name: project.name,
     file_name: file.name,
     file_url: path,
     file_type: file.type || "application/pdf",

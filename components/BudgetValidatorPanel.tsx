@@ -28,7 +28,7 @@ export function BudgetValidatorPanel({ validations, projects }: BudgetValidatorP
           <div>
             <p className="text-xs font-black uppercase text-clay">Validador de presupuestos</p>
             <h2 className="text-xl font-black text-ink">PDF pendientes de OK</h2>
-            <p className="text-sm font-semibold text-muted">Elige obra, sube el PDF y márcalo como validado.</p>
+            <p className="text-sm font-semibold text-muted">Elige obra y sube su PDF; se vincula solo al proyecto.</p>
           </div>
         </div>
         <span className="inline-flex h-9 items-center rounded-full bg-paper px-3 text-sm font-black text-ink">
@@ -36,16 +36,15 @@ export function BudgetValidatorPanel({ validations, projects }: BudgetValidatorP
         </span>
       </div>
 
-      <form action={createBudgetValidationAction} encType="multipart/form-data" className="mt-4 grid gap-2 md:grid-cols-[1fr_1fr_1fr_auto]">
-        <select className="form-input h-12 py-0" name="project_id" defaultValue="">
-          <option value="">Seleccionar obra</option>
+      <form action={createBudgetValidationAction} encType="multipart/form-data" className="mt-4 grid gap-2 md:grid-cols-[1.2fr_1fr_auto]">
+        <select className="form-input h-12 py-0" name="project_id" defaultValue="" required>
+          <option value="" disabled>Seleccionar obra</option>
           {projects.map((project) => (
             <option key={project.id} value={project.id}>
               {project.name} - {project.client_name}
             </option>
           ))}
         </select>
-        <input className="form-input h-12 py-0" name="name" placeholder="Nombre del presupuesto" required minLength={2} />
         <input
           className="form-input h-12 py-1 file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-black file:text-white"
           name="file"
