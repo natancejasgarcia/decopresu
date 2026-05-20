@@ -63,10 +63,12 @@ export async function createBudgetValidationAction(formData: FormData) {
 export async function validateBudgetAction(formData: FormData) {
   const { supabase, user } = await requireUserProfile();
   const validationId = z.string().uuid().parse(formData.get("validation_id"));
+  const validationNotes = optionalNotes.parse(formData.get("validation_notes"));
 
   const { error } = await supabase
     .from("budget_validations")
     .update({
+      validation_notes: validationNotes,
       is_validated: true,
       validated_by: user.id,
       validated_at: new Date().toISOString(),
@@ -81,6 +83,26 @@ export async function validateBudgetAction(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+export async function updateBudgetValidationNotesAction(formData: FormData) {
+  const { supabase } = await requireUserProfile();
+  const validationId = z.string().uuid().parse(formData.get("validation_id"));
+  const validationNotes = optionalNotes.parse(formData.get("validation_notes"));
+
+  const { error } = await supabase
+    .from("budget_validations")
+    .update({ validation_notes: validationNotes })
+    .eq("id", validationId);
+
+  if (error) {
+    console.error("[budget-validation-notes]", error.message);
+    return;
+  }
+
+  revalidatePath("/dashboard");
+}
+
 function isUploadedFile(value: FormDataEntryValue | null): value is File {
   return typeof File !== "undefined" && value instanceof File && value.size > 0;
 }
+
+const optionalNotes = z.preprocess((value) => (typeof value === "string" && value.trim() ? value.trim() : null), z.string().nullable());

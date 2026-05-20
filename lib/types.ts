@@ -82,6 +82,7 @@ export type BudgetValidation = {
   file_name: string;
   file_url: string;
   file_type: string;
+  validation_notes: string | null;
   is_validated: boolean;
   created_by: string;
   validated_by: string | null;

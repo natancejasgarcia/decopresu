@@ -93,6 +93,7 @@ create table if not exists public.budget_validations (
   file_name text not null,
   file_url text not null unique,
   file_type text not null default 'application/pdf',
+  validation_notes text,
   is_validated boolean not null default false,
   created_by uuid not null references public.profiles(user_id) on delete cascade,
   validated_by uuid references public.profiles(user_id) on delete set null,

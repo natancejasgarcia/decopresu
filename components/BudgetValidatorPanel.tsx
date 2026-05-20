@@ -1,5 +1,5 @@
-import { CheckCircle2, FileCheck2, FileText, Upload } from "lucide-react";
-import { createBudgetValidationAction, validateBudgetAction } from "@/actions/budgetValidationActions";
+import { CheckCircle2, ChevronDown, FileCheck2, FileText, Save, Upload } from "lucide-react";
+import { createBudgetValidationAction, updateBudgetValidationNotesAction, validateBudgetAction } from "@/actions/budgetValidationActions";
 import type { BudgetValidation, Project } from "@/lib/types";
 
 type BudgetValidatorPanelProps = {
@@ -89,8 +89,9 @@ function ValidationRow({ validation }: { validation: BudgetValidation }) {
   const createdAt = new Date(validation.created_at);
 
   return (
-    <article className={`rounded-lg border p-3 ${validation.is_validated ? "border-emerald-200 bg-emerald-50/70" : "border-line bg-white"}`}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <details className={`group rounded-lg border p-3 ${validation.is_validated ? "border-emerald-200 bg-emerald-50/70" : "border-line bg-white"}`}>
+      <summary className="cursor-pointer list-none">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <FileText size={17} className={validation.is_validated ? "text-emerald-800" : "text-moss"} />
@@ -119,22 +120,54 @@ function ValidationRow({ validation }: { validation: BudgetValidation }) {
                 Ver PDF
               </a>
             ) : null}
+            {validation.validation_notes ? (
+              <span className="font-black text-ink">Tiene detalles</span>
+            ) : null}
           </div>
         </div>
-        {validation.is_validated ? (
-          <span className="inline-flex h-10 items-center justify-center rounded-lg bg-emerald-100 px-4 text-sm font-black text-emerald-900">
-            OK
-          </span>
-        ) : (
-          <form action={validateBudgetAction}>
+          <div className="flex shrink-0 items-center gap-2">
+            {validation.is_validated ? (
+              <span className="inline-flex h-10 items-center justify-center rounded-lg bg-emerald-100 px-4 text-sm font-black text-emerald-900">
+                OK
+              </span>
+            ) : null}
+            <span className="inline-flex h-10 items-center justify-center gap-1 rounded-lg border border-line bg-white px-3 text-sm font-black text-ink">
+              Detalles
+              <ChevronDown size={16} className="transition-transform group-open:rotate-180" />
+            </span>
+          </div>
+        </div>
+      </summary>
+
+      <div className="mt-3 grid gap-3 border-t border-line pt-3">
+        <form action={updateBudgetValidationNotesAction} className="grid gap-2">
+          <input type="hidden" name="validation_id" value={validation.id} />
+          <label>
+            <span className="form-label">Detalles para revisar o corregir</span>
+            <textarea
+              className="form-input min-h-24"
+              name="validation_notes"
+              defaultValue={validation.validation_notes ?? ""}
+              placeholder="Ej: falta cambiar el color, revisar medidas, añadir partida de materiales..."
+            />
+          </label>
+          <button className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 text-sm font-black text-ink" type="submit">
+            <Save size={16} />
+            Guardar detalles
+          </button>
+        </form>
+
+        {!validation.is_validated ? (
+          <form action={validateBudgetAction} className="grid gap-2">
             <input type="hidden" name="validation_id" value={validation.id} />
+            <input type="hidden" name="validation_notes" value={validation.validation_notes ?? ""} />
             <button className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 text-sm font-black text-white" type="submit">
               <CheckCircle2 size={17} />
-              OK
+              Validar con OK
             </button>
           </form>
-        )}
+        ) : null}
       </div>
-    </article>
+    </details>
   );
 }
