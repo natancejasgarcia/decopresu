@@ -88,6 +88,7 @@ create table if not exists public.daily_notes (
 
 create table if not exists public.budget_validations (
   id uuid primary key default gen_random_uuid(),
+  project_id uuid references public.projects(id) on delete set null,
   name text not null,
   file_name text not null,
   file_url text not null unique,
@@ -225,6 +226,7 @@ create index if not exists dashboard_dismissals_user_day_idx on public.dashboard
 create index if not exists daily_notes_date_done_idx on public.daily_notes(note_date desc, is_done, created_at desc);
 create index if not exists budget_validations_created_at_idx on public.budget_validations(created_at desc);
 create index if not exists budget_validations_status_idx on public.budget_validations(is_validated, created_at desc);
+create index if not exists budget_validations_project_idx on public.budget_validations(project_id, created_at desc);
 create index if not exists project_files_project_id_created_at_idx on public.project_files(project_id, created_at desc);
 create index if not exists rooms_project_id_created_at_idx on public.rooms(project_id, created_at desc);
 create index if not exists budget_items_project_id_created_at_idx on public.budget_items(project_id, created_at);

@@ -146,6 +146,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   }
   const totalUnread = Array.from(unreadByProject.values()).reduce((sum, count) => sum + count, 0);
   const profileNames = new Map((profiles ?? []).map((item) => [item.user_id, item.name]));
+  const projectNamesById = new Map((allProjects ?? []).map((project) => [project.id, project]));
   const enrichedDailyNotes = (dailyNotesUnavailable ? [] : (dailyNotes ?? [])).map((note) => ({
     ...note,
     author_name: profileNames.get(note.created_by) ?? "Decoralia",
@@ -158,6 +159,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         signed_url: data?.signedUrl,
         created_by_name: profileNames.get(item.created_by) ?? "Decoralia",
         validated_by_name: item.validated_by ? profileNames.get(item.validated_by) : undefined,
+        project_name: item.project_id ? projectNamesById.get(item.project_id)?.name : undefined,
+        project_client_name: item.project_id ? projectNamesById.get(item.project_id)?.client_name : undefined,
       };
     }),
   );
@@ -204,7 +207,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           projectType={projectType}
         />
         <TodayPanel cards={todayCards} />
-        <BudgetValidatorPanel validations={enrichedBudgetValidations} />
+        <BudgetValidatorPanel validations={enrichedBudgetValidations} projects={allProjects ?? []} />
         <DailyNotesPanel notes={enrichedDailyNotes} />
 
         <form className="mt-5 grid gap-3 rounded-lg border border-line bg-white p-3 shadow-soft md:grid-cols-[1fr_220px_auto]">

@@ -77,6 +77,7 @@ export type DailyNote = {
 
 export type BudgetValidation = {
   id: string;
+  project_id: string | null;
   name: string;
   file_name: string;
   file_url: string;
@@ -89,6 +90,8 @@ export type BudgetValidation = {
   signed_url?: string;
   created_by_name?: string;
   validated_by_name?: string;
+  project_name?: string;
+  project_client_name?: string;
 };
 
 export type ProjectFile = {

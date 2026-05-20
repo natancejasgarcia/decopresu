@@ -1,9 +1,10 @@
 import { CheckCircle2, FileCheck2, FileText, Upload } from "lucide-react";
 import { createBudgetValidationAction, validateBudgetAction } from "@/actions/budgetValidationActions";
-import type { BudgetValidation } from "@/lib/types";
+import type { BudgetValidation, Project } from "@/lib/types";
 
 type BudgetValidatorPanelProps = {
   validations: BudgetValidation[];
+  projects: Project[];
 };
 
 const timeFormatter = new Intl.DateTimeFormat("es-ES", {
@@ -13,7 +14,7 @@ const timeFormatter = new Intl.DateTimeFormat("es-ES", {
   minute: "2-digit",
 });
 
-export function BudgetValidatorPanel({ validations }: BudgetValidatorPanelProps) {
+export function BudgetValidatorPanel({ validations, projects }: BudgetValidatorPanelProps) {
   const pending = validations.filter((item) => !item.is_validated);
   const validated = validations.filter((item) => item.is_validated);
 
@@ -27,7 +28,7 @@ export function BudgetValidatorPanel({ validations }: BudgetValidatorPanelProps)
           <div>
             <p className="text-xs font-black uppercase text-clay">Validador de presupuestos</p>
             <h2 className="text-xl font-black text-ink">PDF pendientes de OK</h2>
-            <p className="text-sm font-semibold text-muted">Sube el presupuesto, ponle nombre y márcalo como validado.</p>
+            <p className="text-sm font-semibold text-muted">Elige obra, sube el PDF y márcalo como validado.</p>
           </div>
         </div>
         <span className="inline-flex h-9 items-center rounded-full bg-paper px-3 text-sm font-black text-ink">
@@ -35,7 +36,15 @@ export function BudgetValidatorPanel({ validations }: BudgetValidatorPanelProps)
         </span>
       </div>
 
-      <form action={createBudgetValidationAction} encType="multipart/form-data" className="mt-4 grid gap-2 md:grid-cols-[1fr_1fr_auto]">
+      <form action={createBudgetValidationAction} encType="multipart/form-data" className="mt-4 grid gap-2 md:grid-cols-[1fr_1fr_1fr_auto]">
+        <select className="form-input h-12 py-0" name="project_id" defaultValue="">
+          <option value="">Seleccionar obra</option>
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name} - {project.client_name}
+            </option>
+          ))}
+        </select>
         <input className="form-input h-12 py-0" name="name" placeholder="Nombre del presupuesto" required minLength={2} />
         <input
           className="form-input h-12 py-1 file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-black file:text-white"
@@ -86,7 +95,13 @@ function ValidationRow({ validation }: { validation: BudgetValidation }) {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <FileText size={17} className={validation.is_validated ? "text-emerald-800" : "text-moss"} />
-            <strong className="text-sm text-ink">{validation.name}</strong>
+            {validation.signed_url ? (
+              <a className="text-sm font-black text-ink underline decoration-moss underline-offset-4" href={validation.signed_url} target="_blank" rel="noreferrer">
+                {validation.name}
+              </a>
+            ) : (
+              <strong className="text-sm text-ink">{validation.name}</strong>
+            )}
             {validation.is_validated ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-xs font-black text-white">
                 <CheckCircle2 size={14} />
@@ -95,6 +110,10 @@ function ValidationRow({ validation }: { validation: BudgetValidation }) {
             ) : null}
           </div>
           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-muted">
+            <span className="rounded-full bg-paper px-2 py-0.5 font-black text-ink">
+              {validation.project_name ?? "Sin obra"}
+            </span>
+            {validation.project_client_name ? <span>{validation.project_client_name}</span> : null}
             <span>{validation.created_by_name ?? "Decoralia"} - {timeFormatter.format(createdAt)}</span>
             {validation.signed_url ? (
               <a className="font-black text-moss underline" href={validation.signed_url} target="_blank" rel="noreferrer">

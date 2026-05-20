@@ -8,6 +8,7 @@ const MAX_VALIDATION_FILE_SIZE = 15 * 1024 * 1024;
 
 const createValidationSchema = z.object({
   name: z.string().trim().min(2),
+  project_id: z.preprocess((value) => (value === "" || value === null ? null : value), z.string().uuid().nullable()),
 });
 
 export async function createBudgetValidationAction(formData: FormData) {
@@ -33,6 +34,7 @@ export async function createBudgetValidationAction(formData: FormData) {
   }
 
   const { error } = await supabase.from("budget_validations").insert({
+    project_id: parsed.data.project_id,
     name: parsed.data.name,
     file_name: file.name,
     file_url: path,
