@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
+import { BudgetValidatorPanel } from "@/components/BudgetValidatorPanel";
 import { DashboardStats } from "@/components/DashboardStats";
 import { DailyNotesPanel } from "@/components/DailyNotesPanel";
 import { TopBar } from "@/components/TopBar";
@@ -7,7 +8,7 @@ import { ProjectCard } from "@/components/ProjectCard";
 import { TodayPanel, type TodayCard } from "@/components/TodayPanel";
 import { requireUserProfile } from "@/lib/auth";
 import { parseMonthKey } from "@/lib/finance";
-import { PROJECT_STATUSES, PROJECT_TYPES, type DailyNote, type Message, type Profile, type Project, type ProjectRead, type ProjectStatus, type ProjectType } from "@/lib/types";
+import { PROJECT_STATUSES, PROJECT_TYPES, type BudgetValidation, type DailyNote, type Message, type Profile, type Project, type ProjectRead, type ProjectStatus, type ProjectType } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +66,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     { data: projectReads, error: projectReadsError },
     { data: dismissedItems, error: dismissedItemsError },
     { data: dailyNotes, error: dailyNotesError },
+    { data: budgetValidations, error: budgetValidationsError },
     { data: profiles, error: profilesError },
     { data: payments, error: paymentsError },
   ] = await Promise.all([
@@ -85,6 +87,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       .order("is_done", { ascending: true })
       .order("created_at", { ascending: false })
       .returns<DailyNote[]>(),
+    supabase
+      .from("budget_validations")
+      .select("*")
+      .order("is_validated", { ascending: true })
+      .order("created_at", { ascending: false })
+      .limit(12)
+      .returns<BudgetValidation[]>(),
     supabase.from("profiles").select("*").returns<Profile[]>(),
     supabase.from("project_payments").select("project_id,amount,payment_date").returns<DashboardPayment[]>(),
   ]);
@@ -92,10 +101,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const projectReadsUnavailable = isOptionalDashboardError(projectReadsError);
   const dismissedItemsUnavailable = isOptionalDashboardError(dismissedItemsError);
   const dailyNotesUnavailable = isOptionalDashboardError(dailyNotesError);
+  const budgetValidationsUnavailable = isOptionalDashboardError(budgetValidationsError);
   const paymentsTableMissing = paymentsError?.code === "42P01";
   const paymentsUnavailable = isOptionalDashboardError(paymentsError);
 
-  if (error || allProjectsError || budgetItemsError || messagesError || !projectReadsUnavailable && projectReadsError || !dismissedItemsUnavailable && dismissedItemsError || !dailyNotesUnavailable && dailyNotesError || profilesError || !paymentsUnavailable && paymentsError) {
+  if (error || allProjectsError || budgetItemsError || messagesError || !projectReadsUnavailable && projectReadsError || !dismissedItemsUnavailable && dismissedItemsError || !dailyNotesUnavailable && dailyNotesError || !budgetValidationsUnavailable && budgetValidationsError || profilesError || !paymentsUnavailable && paymentsError) {
     throw new Error(
       error?.message
         ?? allProjectsError?.message
@@ -104,6 +114,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         ?? projectReadsError?.message
         ?? dismissedItemsError?.message
         ?? dailyNotesError?.message
+        ?? budgetValidationsError?.message
         ?? profilesError?.message
         ?? paymentsError?.message,
     );
@@ -139,6 +150,17 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     ...note,
     author_name: profileNames.get(note.created_by) ?? "Decoralia",
   }));
+  const enrichedBudgetValidations = await Promise.all(
+    (budgetValidationsUnavailable ? [] : (budgetValidations ?? [])).map(async (item) => {
+      const { data } = await supabase.storage.from("project-files").createSignedUrl(item.file_url, 60 * 60);
+      return {
+        ...item,
+        signed_url: data?.signedUrl,
+        created_by_name: profileNames.get(item.created_by) ?? "Decoralia",
+        validated_by_name: item.validated_by ? profileNames.get(item.validated_by) : undefined,
+      };
+    }),
+  );
   const projectsWithUnread = Array.from(unreadByProject.values()).filter((count) => count > 0).length;
   const pendingProjects = metricProjects.filter((project) => project.status === "Pendiente");
   const quotedProjects = metricProjects.filter((project) => project.status === "Presupuestado");
@@ -182,6 +204,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           projectType={projectType}
         />
         <TodayPanel cards={todayCards} />
+        <BudgetValidatorPanel validations={enrichedBudgetValidations} />
         <DailyNotesPanel notes={enrichedDailyNotes} />
 
         <form className="mt-5 grid gap-3 rounded-lg border border-line bg-white p-3 shadow-soft md:grid-cols-[1fr_220px_auto]">

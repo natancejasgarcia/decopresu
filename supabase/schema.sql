@@ -86,6 +86,19 @@ create table if not exists public.daily_notes (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.budget_validations (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  file_name text not null,
+  file_url text not null unique,
+  file_type text not null default 'application/pdf',
+  is_validated boolean not null default false,
+  created_by uuid not null references public.profiles(user_id) on delete cascade,
+  validated_by uuid references public.profiles(user_id) on delete set null,
+  created_at timestamptz not null default now(),
+  validated_at timestamptz
+);
+
 create table if not exists public.project_files (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.projects(id) on delete cascade,
@@ -210,6 +223,8 @@ create index if not exists messages_project_id_created_at_idx on public.messages
 create index if not exists project_reads_user_project_idx on public.project_reads(user_id, project_id);
 create index if not exists dashboard_dismissals_user_day_idx on public.dashboard_dismissals(user_id, dismissed_on);
 create index if not exists daily_notes_date_done_idx on public.daily_notes(note_date desc, is_done, created_at desc);
+create index if not exists budget_validations_created_at_idx on public.budget_validations(created_at desc);
+create index if not exists budget_validations_status_idx on public.budget_validations(is_validated, created_at desc);
 create index if not exists project_files_project_id_created_at_idx on public.project_files(project_id, created_at desc);
 create index if not exists rooms_project_id_created_at_idx on public.rooms(project_id, created_at desc);
 create index if not exists budget_items_project_id_created_at_idx on public.budget_items(project_id, created_at);
@@ -228,6 +243,7 @@ alter table public.messages enable row level security;
 alter table public.project_reads enable row level security;
 alter table public.dashboard_dismissals enable row level security;
 alter table public.daily_notes enable row level security;
+alter table public.budget_validations enable row level security;
 alter table public.project_files enable row level security;
 alter table public.rooms enable row level security;
 alter table public.budget_items enable row level security;
@@ -330,6 +346,31 @@ with check (public.is_decoralia_user());
 drop policy if exists "daily_notes_delete_authorized" on public.daily_notes;
 create policy "daily_notes_delete_authorized"
 on public.daily_notes for delete
+to authenticated
+using (public.is_decoralia_user());
+
+drop policy if exists "budget_validations_select_authorized" on public.budget_validations;
+create policy "budget_validations_select_authorized"
+on public.budget_validations for select
+to authenticated
+using (public.is_decoralia_user());
+
+drop policy if exists "budget_validations_insert_authorized" on public.budget_validations;
+create policy "budget_validations_insert_authorized"
+on public.budget_validations for insert
+to authenticated
+with check (public.is_decoralia_user() and created_by = auth.uid());
+
+drop policy if exists "budget_validations_update_authorized" on public.budget_validations;
+create policy "budget_validations_update_authorized"
+on public.budget_validations for update
+to authenticated
+using (public.is_decoralia_user())
+with check (public.is_decoralia_user());
+
+drop policy if exists "budget_validations_delete_authorized" on public.budget_validations;
+create policy "budget_validations_delete_authorized"
+on public.budget_validations for delete
 to authenticated
 using (public.is_decoralia_user());
 

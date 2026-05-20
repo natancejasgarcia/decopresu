@@ -1,0 +1,122 @@
+import { CheckCircle2, FileCheck2, FileText, Upload } from "lucide-react";
+import { createBudgetValidationAction, validateBudgetAction } from "@/actions/budgetValidationActions";
+import type { BudgetValidation } from "@/lib/types";
+
+type BudgetValidatorPanelProps = {
+  validations: BudgetValidation[];
+};
+
+const timeFormatter = new Intl.DateTimeFormat("es-ES", {
+  day: "2-digit",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+export function BudgetValidatorPanel({ validations }: BudgetValidatorPanelProps) {
+  const pending = validations.filter((item) => !item.is_validated);
+  const validated = validations.filter((item) => item.is_validated);
+
+  return (
+    <section className="mt-5 rounded-lg border border-line bg-white p-4 shadow-soft">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-800">
+            <FileCheck2 size={21} />
+          </div>
+          <div>
+            <p className="text-xs font-black uppercase text-clay">Validador de presupuestos</p>
+            <h2 className="text-xl font-black text-ink">PDF pendientes de OK</h2>
+            <p className="text-sm font-semibold text-muted">Sube el presupuesto, ponle nombre y márcalo como validado.</p>
+          </div>
+        </div>
+        <span className="inline-flex h-9 items-center rounded-full bg-paper px-3 text-sm font-black text-ink">
+          {pending.length} por validar
+        </span>
+      </div>
+
+      <form action={createBudgetValidationAction} encType="multipart/form-data" className="mt-4 grid gap-2 md:grid-cols-[1fr_1fr_auto]">
+        <input className="form-input h-12 py-0" name="name" placeholder="Nombre del presupuesto" required minLength={2} />
+        <input
+          className="form-input h-12 py-1 file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-black file:text-white"
+          name="file"
+          type="file"
+          accept="application/pdf,.pdf"
+          required
+        />
+        <button className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-moss px-5 font-black text-white" type="submit">
+          <Upload size={18} />
+          Subir PDF
+        </button>
+      </form>
+
+      <div className="mt-4 grid gap-2">
+        {validations.length === 0 ? (
+          <div className="rounded-lg bg-paper p-4 text-sm font-semibold text-muted">
+            No hay presupuestos subidos para validar.
+          </div>
+        ) : (
+          <>
+            {pending.map((item) => (
+              <ValidationRow key={item.id} validation={item} />
+            ))}
+            {validated.length > 0 ? (
+              <div className="mt-2 border-t border-line pt-3">
+                <p className="mb-2 text-xs font-black uppercase text-muted">Validados</p>
+                <div className="grid gap-2">
+                  {validated.map((item) => (
+                    <ValidationRow key={item.id} validation={item} />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function ValidationRow({ validation }: { validation: BudgetValidation }) {
+  const createdAt = new Date(validation.created_at);
+
+  return (
+    <article className={`rounded-lg border p-3 ${validation.is_validated ? "border-emerald-200 bg-emerald-50/70" : "border-line bg-white"}`}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <FileText size={17} className={validation.is_validated ? "text-emerald-800" : "text-moss"} />
+            <strong className="text-sm text-ink">{validation.name}</strong>
+            {validation.is_validated ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-xs font-black text-white">
+                <CheckCircle2 size={14} />
+                Validado
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-muted">
+            <span>{validation.created_by_name ?? "Decoralia"} - {timeFormatter.format(createdAt)}</span>
+            {validation.signed_url ? (
+              <a className="font-black text-moss underline" href={validation.signed_url} target="_blank" rel="noreferrer">
+                Ver PDF
+              </a>
+            ) : null}
+          </div>
+        </div>
+        {validation.is_validated ? (
+          <span className="inline-flex h-10 items-center justify-center rounded-lg bg-emerald-100 px-4 text-sm font-black text-emerald-900">
+            OK
+          </span>
+        ) : (
+          <form action={validateBudgetAction}>
+            <input type="hidden" name="validation_id" value={validation.id} />
+            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 text-sm font-black text-white" type="submit">
+              <CheckCircle2 size={17} />
+              OK
+            </button>
+          </form>
+        )}
+      </div>
+    </article>
+  );
+}

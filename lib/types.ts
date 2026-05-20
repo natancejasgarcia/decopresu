@@ -75,6 +75,22 @@ export type DailyNote = {
   author_name?: string;
 };
 
+export type BudgetValidation = {
+  id: string;
+  name: string;
+  file_name: string;
+  file_url: string;
+  file_type: string;
+  is_validated: boolean;
+  created_by: string;
+  validated_by: string | null;
+  created_at: string;
+  validated_at: string | null;
+  signed_url?: string;
+  created_by_name?: string;
+  validated_by_name?: string;
+};
+
 export type ProjectFile = {
   id: string;
   project_id: string;
