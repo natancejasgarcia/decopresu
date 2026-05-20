@@ -1,5 +1,5 @@
-import { CheckCircle2, ChevronDown, FileCheck2, FileText, Save, Upload } from "lucide-react";
-import { createBudgetValidationAction, updateBudgetValidationNotesAction, validateBudgetAction } from "@/actions/budgetValidationActions";
+import { CheckCircle2, ChevronDown, FileCheck2, FileText, Save, Trash2, Upload } from "lucide-react";
+import { createBudgetValidationAction, deleteBudgetValidationAction, updateBudgetValidationNotesAction, validateBudgetAction } from "@/actions/budgetValidationActions";
 import type { BudgetValidation, Project } from "@/lib/types";
 
 type BudgetValidatorPanelProps = {
@@ -166,7 +166,16 @@ function ValidationRow({ validation }: { validation: BudgetValidation }) {
               Validar con OK
             </button>
           </form>
-        ) : null}
+        ) : (
+          <form action={deleteBudgetValidationAction}>
+            <input type="hidden" name="validation_id" value={validation.id} />
+            <input type="hidden" name="file_url" value={validation.file_url} />
+            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-red-100 bg-red-50 px-5 text-sm font-black text-red-700" type="submit">
+              <Trash2 size={17} />
+              Borrar validado
+            </button>
+          </form>
+        )}
       </div>
     </details>
   );

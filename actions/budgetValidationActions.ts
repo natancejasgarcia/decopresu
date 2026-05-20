@@ -101,6 +101,32 @@ export async function updateBudgetValidationNotesAction(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+export async function deleteBudgetValidationAction(formData: FormData) {
+  const { supabase } = await requireUserProfile();
+  const validationId = z.string().uuid().parse(formData.get("validation_id"));
+  const fileUrl = z.string().min(1).optional().parse(formData.get("file_url") || undefined);
+
+  const { error } = await supabase
+    .from("budget_validations")
+    .delete()
+    .eq("id", validationId)
+    .eq("is_validated", true);
+
+  if (error) {
+    console.error("[budget-validation-delete]", error.message);
+    return;
+  }
+
+  if (fileUrl) {
+    const { error: storageError } = await supabase.storage.from("project-files").remove([fileUrl]);
+    if (storageError) {
+      console.error("[budget-validation-delete-file]", storageError.message);
+    }
+  }
+
+  revalidatePath("/dashboard");
+}
+
 function isUploadedFile(value: FormDataEntryValue | null): value is File {
   return typeof File !== "undefined" && value instanceof File && value.size > 0;
 }
