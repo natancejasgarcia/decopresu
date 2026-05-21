@@ -250,6 +250,24 @@ export async function GET(_request: NextRequest, { params }: Context) {
     }
   }
 
+  y -= 16;
+  ({ page, y } = ensurePage(pdf, page, y, 95));
+  y = sectionTitle(page, "Condiciones del presupuesto", y, fonts);
+  const budgetConditions = [
+    "1. Para iniciar los trabajos se abonara el 30% del importe presupuestado en concepto de reserva de fecha, organizacion del trabajo y acopio inicial de materiales.",
+    "2. Este presupuesto incluye exclusivamente los conceptos detallados anteriormente. Cualquier trabajo, reparacion, material o actuacion no descrita en este documento no esta incluido y se presupuestara aparte antes de realizarse.",
+    "3. La aceptacion del presupuesto implica la conformidad con estas condiciones.",
+  ];
+  for (const condition of budgetConditions) {
+    const lines = wrapText(condition, fonts.regular, 7.8, PAGE_WIDTH - MARGIN * 2);
+    ({ page, y } = ensurePage(pdf, page, y, 12 * lines.length + 8));
+    for (const line of lines) {
+      page.drawText(line, { x: MARGIN, y: y - 12, size: 7.8, font: fonts.regular, color: INK });
+      y -= 10;
+    }
+    y -= 3;
+  }
+
   if (rooms.length > 0) {
     y -= 16;
     ({ page, y } = ensurePage(pdf, page, y, 95));

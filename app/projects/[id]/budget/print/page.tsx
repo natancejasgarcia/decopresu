@@ -163,6 +163,22 @@ export default async function PrintBudgetPage({ params }: PrintBudgetPageProps) 
           </table>
         </section>
 
+        <section className="mt-7 border-t border-[#d8ddd8] pt-4 text-[12px] leading-relaxed text-[#152630]">
+          <h2 className="mb-3 text-[13px] font-black uppercase tracking-[0.04em]">Condiciones del presupuesto</h2>
+          <ol className="space-y-2 pl-4">
+            <li>
+              Para iniciar los trabajos se abonara el 30% del importe presupuestado en concepto de reserva de fecha,
+              organizacion del trabajo y acopio inicial de materiales.
+            </li>
+            <li>
+              Este presupuesto incluye exclusivamente los conceptos detallados anteriormente. Cualquier trabajo,
+              reparacion, material o actuacion no descrita en este documento no esta incluido y se presupuestara aparte
+              antes de realizarse.
+            </li>
+            <li>La aceptacion del presupuesto implica la conformidad con estas condiciones.</li>
+          </ol>
+        </section>
+
         <section className="mt-7 ml-auto w-full max-w-[330px] text-[14px]">
           <div className="grid grid-cols-[1fr_auto] gap-y-3 border-b border-[#d8ddd8] pb-3">
             <span className="font-black text-[#58636c]">Base imponible:</span>
