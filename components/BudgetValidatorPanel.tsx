@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CheckCircle2, ChevronDown, FileCheck2, FileText, RefreshCw, Save, Trash2, Upload } from "lucide-react";
 import { createBudgetValidationAction, deleteBudgetValidationAction, updateBudgetValidationNotesAction, updateBudgetValidationPdfAction, validateBudgetAction } from "@/actions/budgetValidationActions";
 import type { BudgetValidation, Project } from "@/lib/types";
@@ -101,10 +102,10 @@ function ValidationRow({ validation }: { validation: BudgetValidation }) {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <FileText size={17} className={validation.is_validated ? "text-emerald-800" : "text-moss"} />
-            {validation.signed_url ? (
-              <a className="text-sm font-black text-ink underline decoration-moss underline-offset-4" href={validation.signed_url} target="_blank" rel="noreferrer">
+            {validation.project_id ? (
+              <Link className="text-sm font-black text-ink underline decoration-moss underline-offset-4" href={`/projects/${validation.project_id}`}>
                 {validation.name}
-              </a>
+              </Link>
             ) : (
               <strong className="text-sm text-ink">{validation.name}</strong>
             )}
