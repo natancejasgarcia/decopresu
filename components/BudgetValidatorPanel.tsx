@@ -1,5 +1,5 @@
-import { CheckCircle2, ChevronDown, FileCheck2, FileText, Save, Trash2, Upload } from "lucide-react";
-import { createBudgetValidationAction, deleteBudgetValidationAction, updateBudgetValidationNotesAction, validateBudgetAction } from "@/actions/budgetValidationActions";
+import { CheckCircle2, ChevronDown, FileCheck2, FileText, RefreshCw, Save, Trash2, Upload } from "lucide-react";
+import { createBudgetValidationAction, deleteBudgetValidationAction, updateBudgetValidationNotesAction, updateBudgetValidationPdfAction, validateBudgetAction } from "@/actions/budgetValidationActions";
 import type { BudgetValidation, Project } from "@/lib/types";
 
 type BudgetValidatorPanelProps = {
@@ -15,8 +15,8 @@ const timeFormatter = new Intl.DateTimeFormat("es-ES", {
 });
 
 export function BudgetValidatorPanel({ validations, projects }: BudgetValidatorPanelProps) {
-  const pending = validations.filter((item) => !item.is_validated);
-  const validated = validations.filter((item) => item.is_validated);
+  const pending = validations.filter((item) => !item.is_validated || item.validation_notes);
+  const validated = validations.filter((item) => item.is_validated && !item.validation_notes);
 
   return (
     <section className="mt-5 rounded-lg border border-line bg-white p-4 shadow-soft">
@@ -89,7 +89,13 @@ function ValidationRow({ validation }: { validation: BudgetValidation }) {
   const createdAt = new Date(validation.created_at);
 
   return (
-    <details className={`group rounded-lg border p-3 ${validation.is_validated ? "border-emerald-200 bg-emerald-50/70" : "border-line bg-white"}`}>
+    <details className={`group rounded-lg border p-3 ${
+      validation.validation_notes
+        ? "border-amber-200 bg-amber-50/70"
+        : validation.is_validated
+          ? "border-emerald-200 bg-emerald-50/70"
+          : "border-line bg-white"
+    }`}>
       <summary className="cursor-pointer list-none">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
@@ -102,7 +108,11 @@ function ValidationRow({ validation }: { validation: BudgetValidation }) {
             ) : (
               <strong className="text-sm text-ink">{validation.name}</strong>
             )}
-            {validation.is_validated ? (
+            {validation.validation_notes ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800">
+                Pendiente de revisión
+              </span>
+            ) : validation.is_validated ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-xs font-black text-white">
                 <CheckCircle2 size={14} />
                 Validado
@@ -119,9 +129,6 @@ function ValidationRow({ validation }: { validation: BudgetValidation }) {
               <a className="font-black text-moss underline" href={validation.signed_url} target="_blank" rel="noreferrer">
                 Ver PDF
               </a>
-            ) : null}
-            {validation.validation_notes ? (
-              <span className="font-black text-ink">Tiene detalles</span>
             ) : null}
           </div>
         </div>
@@ -154,6 +161,22 @@ function ValidationRow({ validation }: { validation: BudgetValidation }) {
           <button className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 text-sm font-black text-ink" type="submit">
             <Save size={16} />
             Guardar detalles
+          </button>
+        </form>
+
+        <form action={updateBudgetValidationPdfAction} encType="multipart/form-data" className="grid gap-2 rounded-lg bg-paper p-3 md:grid-cols-[1fr_auto]">
+          <input type="hidden" name="validation_id" value={validation.id} />
+          <input type="hidden" name="file_url" value={validation.file_url} />
+          <input
+            className="form-input h-11 py-1 file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-black file:text-white"
+            name="file"
+            type="file"
+            accept="application/pdf,.pdf"
+            required
+          />
+          <button className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-moss px-4 text-sm font-black text-white" type="submit">
+            <RefreshCw size={16} />
+            Cambiar PDF
           </button>
         </form>
 

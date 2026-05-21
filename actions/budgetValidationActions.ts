@@ -101,6 +101,67 @@ export async function updateBudgetValidationNotesAction(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+export async function updateBudgetValidationPdfAction(formData: FormData) {
+  const { supabase } = await requireUserProfile();
+  const validationId = z.string().uuid().parse(formData.get("validation_id"));
+  const oldFileUrl = z.string().min(1).optional().parse(formData.get("file_url") || undefined);
+  const file = formData.get("file");
+
+  if (!isUploadedFile(file)) return;
+  if (file.size > MAX_VALIDATION_FILE_SIZE) return;
+  if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) return;
+
+  const { data: validation, error: validationError } = await supabase
+    .from("budget_validations")
+    .select("project_id")
+    .eq("id", validationId)
+    .single<{ project_id: string | null }>();
+
+  if (validationError || !validation) {
+    console.error("[budget-validation-pdf-load]", validationError?.message ?? "Validacion no encontrada");
+    return;
+  }
+
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+  const folder = validation.project_id ?? "budget-validations";
+  const path = `${folder}/budget-validations/${crypto.randomUUID()}-${safeName}`;
+  const { error: uploadError } = await supabase.storage.from("project-files").upload(path, file, {
+    contentType: file.type || "application/pdf",
+    upsert: false,
+  });
+
+  if (uploadError) {
+    console.error("[budget-validation-pdf-upload]", uploadError.message);
+    return;
+  }
+
+  const { error } = await supabase
+    .from("budget_validations")
+    .update({
+      file_name: file.name,
+      file_url: path,
+      file_type: file.type || "application/pdf",
+      is_validated: false,
+      validated_by: null,
+      validated_at: null,
+    })
+    .eq("id", validationId);
+
+  if (error) {
+    console.error("[budget-validation-pdf-update]", error.message);
+    return;
+  }
+
+  if (oldFileUrl) {
+    const { error: storageError } = await supabase.storage.from("project-files").remove([oldFileUrl]);
+    if (storageError) {
+      console.error("[budget-validation-pdf-remove-old]", storageError.message);
+    }
+  }
+
+  revalidatePath("/dashboard");
+}
+
 export async function deleteBudgetValidationAction(formData: FormData) {
   const { supabase } = await requireUserProfile();
   const validationId = z.string().uuid().parse(formData.get("validation_id"));
