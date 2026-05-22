@@ -254,7 +254,7 @@ export async function GET(_request: NextRequest, { params }: Context) {
   ({ page, y } = ensurePage(pdf, page, y, 95));
   y = sectionTitle(page, "Condiciones del presupuesto", y, fonts);
   const budgetConditions = [
-    "1. Para iniciar los trabajos se abonara el 30% del importe presupuestado en concepto de reserva de fecha, organizacion del trabajo y acopio inicial de materiales.",
+    "1. Para iniciar los trabajos se abonara el 35% del importe presupuestado en concepto de reserva de fecha, organizacion del trabajo y acopio inicial de materiales.",
     "2. Este presupuesto incluye exclusivamente los conceptos detallados anteriormente. Cualquier trabajo, reparacion, material o actuacion no descrita en este documento no esta incluido y se presupuestara aparte antes de realizarse.",
     "3. La aceptacion del presupuesto implica la conformidad con estas condiciones.",
   ];

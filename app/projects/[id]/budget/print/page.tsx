@@ -167,7 +167,7 @@ export default async function PrintBudgetPage({ params }: PrintBudgetPageProps) 
           <h2 className="mb-3 text-[13px] font-black uppercase tracking-[0.04em]">Condiciones del presupuesto</h2>
           <ol className="space-y-2 pl-4">
             <li>
-              Para iniciar los trabajos se abonara el 30% del importe presupuestado en concepto de reserva de fecha,
+              Para iniciar los trabajos se abonara el 35% del importe presupuestado en concepto de reserva de fecha,
               organizacion del trabajo y acopio inicial de materiales.
             </li>
             <li>
