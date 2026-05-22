@@ -42,6 +42,7 @@ export async function createProjectAction(formData: FormData) {
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/projects");
   redirect(`/projects/${data.id}`);
 }
 
@@ -61,6 +62,7 @@ export async function updateProjectStatusAction(formData: FormData) {
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/dashboard");
+  revalidatePath("/projects");
 }
 
 export async function updateProjectAction(formData: FormData) {
@@ -88,6 +90,7 @@ export async function updateProjectAction(formData: FormData) {
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/dashboard");
+  revalidatePath("/projects");
 }
 
 export async function deleteProjectAction(formData: FormData) {
@@ -125,4 +128,5 @@ export async function deleteProjectAction(formData: FormData) {
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/projects");
 }

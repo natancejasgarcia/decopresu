@@ -80,7 +80,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     <main className="min-h-screen pb-24">
       <TopBar profile={profile} />
       <div className="mx-auto max-w-6xl px-4 py-5">
-        <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-black text-moss">
+        <Link href="/projects" className="inline-flex items-center gap-2 text-sm font-black text-moss">
           <ArrowLeft size={17} />
           Proyectos
         </Link>

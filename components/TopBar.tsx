@@ -22,7 +22,8 @@ export function TopBar({ profile }: TopBarProps) {
         </div>
         <div className="flex items-center gap-2">
           <nav className="hidden items-center gap-1 rounded-lg bg-paper p-1 sm:flex">
-            <Link className="rounded-md px-3 py-2 text-sm font-black text-ink hover:bg-white" href="/dashboard">Proyectos</Link>
+            <Link className="rounded-md px-3 py-2 text-sm font-black text-ink hover:bg-white" href="/dashboard">Inicio</Link>
+            <Link className="rounded-md px-3 py-2 text-sm font-black text-ink hover:bg-white" href="/projects">Proyectos</Link>
             <Link className="rounded-md px-3 py-2 text-sm font-black text-ink hover:bg-white" href="/finance">Finanzas</Link>
             <Link className="rounded-md px-3 py-2 text-sm font-black text-ink hover:bg-white" href="/emails">Correos</Link>
           </nav>
@@ -35,7 +36,8 @@ export function TopBar({ profile }: TopBarProps) {
         </div>
       </div>
       <nav className="flex gap-2 border-t border-line px-4 py-2 sm:hidden">
-        <Link className="flex-1 rounded-lg bg-paper px-3 py-2 text-center text-sm font-black text-ink" href="/dashboard">Proyectos</Link>
+        <Link className="flex-1 rounded-lg bg-paper px-3 py-2 text-center text-sm font-black text-ink" href="/dashboard">Inicio</Link>
+        <Link className="flex-1 rounded-lg bg-paper px-3 py-2 text-center text-sm font-black text-ink" href="/projects">Obras</Link>
         <Link className="flex-1 rounded-lg bg-paper px-3 py-2 text-center text-sm font-black text-ink" href="/finance">Finanzas</Link>
         <Link className="flex-1 rounded-lg bg-paper px-3 py-2 text-center text-sm font-black text-ink" href="/emails">Correos</Link>
       </nav>

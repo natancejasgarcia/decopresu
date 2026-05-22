@@ -58,6 +58,7 @@ export async function createBudgetValidationAction(formData: FormData) {
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/validations");
 }
 
 export async function validateBudgetAction(formData: FormData) {
@@ -81,6 +82,7 @@ export async function validateBudgetAction(formData: FormData) {
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/validations");
 }
 
 export async function updateBudgetValidationNotesAction(formData: FormData) {
@@ -99,6 +101,7 @@ export async function updateBudgetValidationNotesAction(formData: FormData) {
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/validations");
 }
 
 export async function updateBudgetValidationPdfAction(formData: FormData) {
@@ -160,6 +163,7 @@ export async function updateBudgetValidationPdfAction(formData: FormData) {
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/validations");
 }
 
 export async function deleteBudgetValidationAction(formData: FormData) {
@@ -186,6 +190,7 @@ export async function deleteBudgetValidationAction(formData: FormData) {
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/validations");
 }
 
 function isUploadedFile(value: FormDataEntryValue | null): value is File {

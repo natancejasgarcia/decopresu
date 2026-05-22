@@ -26,6 +26,7 @@ export async function createDailyNoteAction(formData: FormData) {
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/notes");
 }
 
 export async function toggleDailyNoteAction(formData: FormData) {
@@ -43,6 +44,7 @@ export async function toggleDailyNoteAction(formData: FormData) {
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/notes");
 }
 
 export async function deleteDailyNoteAction(formData: FormData) {
@@ -59,4 +61,5 @@ export async function deleteDailyNoteAction(formData: FormData) {
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/notes");
 }
