@@ -21,6 +21,8 @@ export const PROJECT_TYPES: ProjectType[] = ["Pintura", "Laca"];
 
 export type RoomPaintScope = "walls_and_ceiling" | "ceiling_only" | "walls_only" | "manual_area";
 
+export type RoomModuleType = "ceiling_only" | "walls_only" | "manual_area" | "free";
+
 export type Profile = {
   id: string;
   user_id: string;
@@ -121,6 +123,22 @@ export type Room = {
   paint_scope: RoomPaintScope;
   unit_price: number;
   notes: string | null;
+  created_at: string;
+  modules?: RoomModule[];
+};
+
+export type RoomModule = {
+  id: string;
+  project_id: string;
+  room_id: string;
+  module_type: RoomModuleType;
+  concept: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  total: number;
+  notes: string | null;
+  created_by: string;
   created_at: string;
 };
 

@@ -32,6 +32,16 @@ const CONCEPTS = [
   "Otros",
 ];
 
+function getRoomModulesTotal(room: Room) {
+  return (room.modules ?? []).reduce((sum, module) => sum + Number(module.total), 0);
+}
+
+function getRoomModulesArea(room: Room) {
+  return (room.modules ?? [])
+    .filter((module) => module.unit.toLowerCase() === "m2")
+    .reduce((sum, module) => sum + Number(module.quantity), 0);
+}
+
 export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -42,11 +52,11 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
   const [editIsFixedPrice, setEditIsFixedPrice] = useState(false);
   const total = useMemo(() => items.reduce((sum, item) => sum + Number(item.total), 0), [items]);
   const roomArea = useMemo(
-    () => rooms.reduce((sum, room) => sum + Number(room.total_paintable_area), 0),
+    () => rooms.reduce((sum, room) => sum + Number(room.total_paintable_area) + getRoomModulesArea(room), 0),
     [rooms],
   );
   const roomEstimate = useMemo(
-    () => rooms.reduce((sum, room) => sum + Number(room.total_paintable_area) * Number(room.unit_price ?? 0), 0),
+    () => rooms.reduce((sum, room) => sum + Number(room.total_paintable_area) * Number(room.unit_price ?? 0) + getRoomModulesTotal(room), 0),
     [rooms],
   );
 
@@ -158,12 +168,12 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
             <p className="text-xs font-black uppercase text-muted">Presupuesto desde habitaciones</p>
             <h3 className="mt-1 text-xl font-black text-ink">{formatCurrency(roomEstimate)}</h3>
             <p className="mt-1 text-sm font-semibold text-muted">
-              {rooms.length} habitaciones - {roomArea.toFixed(2)} m2 - precio propio por habitacion
+              {rooms.length} habitaciones - {roomArea.toFixed(2)} m2 - una partida agrupada por habitacion
             </p>
           </div>
           <button
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-moss px-4 font-black text-white disabled:opacity-60"
-            disabled={isPending || roomArea <= 0}
+            disabled={isPending || roomEstimate <= 0}
           >
             <Calculator size={18} />
             Crear lineas

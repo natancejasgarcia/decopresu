@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUserProfile } from "@/lib/auth";
-import type { Room } from "@/lib/types";
+import { formatCurrency } from "@/lib/calculations";
+import type { Room, RoomModule } from "@/lib/types";
 
 type Supabase = Awaited<ReturnType<typeof requireUserProfile>>["supabase"];
 
@@ -144,32 +145,40 @@ export async function createBudgetItemsFromRoomsAction(formData: FormData) {
     .order("created_at", { ascending: true })
     .returns<Room[]>();
 
+  const { data: modules, error: modulesError } = await supabase
+    .from("room_modules")
+    .select("*")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: true })
+    .returns<RoomModule[]>();
+
   if (roomsError) {
     throw new Error(roomsError.message);
   }
 
+  const roomModules = isOptionalRoomModulesError(modulesError) ? [] : (modules ?? []);
+  if (modulesError && !isOptionalRoomModulesError(modulesError)) {
+    throw new Error(modulesError.message);
+  }
+
+  const modulesByRoom = new Map<string, RoomModule[]>();
+  for (const module of roomModules) {
+    modulesByRoom.set(module.room_id, [...(modulesByRoom.get(module.room_id) ?? []), module]);
+  }
+
   const firstSortOrder = await getNextBudgetSortOrder(supabase, projectId);
   const rows = (rooms ?? [])
-    .filter((room) => Number(room.total_paintable_area) > 0)
+    .filter((room) => {
+      const modulesTotal = (modulesByRoom.get(room.id) ?? []).reduce((sum, module) => sum + Number(module.total), 0);
+      return Number(room.total_paintable_area) > 0 || modulesTotal > 0;
+    })
     .map((room, index) => ({
       project_id: projectId,
-      concept: `${room.name} - ${
-        room.paint_scope === "manual_area"
-          ? "Metro cuadrado"
-          : room.paint_scope === "ceiling_only"
-            ? "Solo techo"
-            : room.paint_scope === "walls_only"
-              ? "Solo paredes"
-              : "Techo y paredes"
-      }`,
-      notes:
-        room.notes ||
-        (room.paint_scope === "manual_area"
-          ? `${Number(room.manual_area ?? room.total_paintable_area)} m2`
-          : `${Number(room.length)} x ${Number(room.width)} x ${Number(room.height)} m`),
-      quantity: Number(room.total_paintable_area),
-      unit: "m2",
-      unit_price: Number(room.unit_price ?? 0),
+      concept: room.name,
+      notes: buildRoomBudgetNotes(room, modulesByRoom.get(room.id) ?? []),
+      quantity: 1,
+      unit: "",
+      unit_price: getRoomBudgetTotal(room, modulesByRoom.get(room.id) ?? []),
       sort_order: firstSortOrder + index,
     }));
 
@@ -190,6 +199,56 @@ export async function createBudgetItemsFromRoomsAction(formData: FormData) {
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/dashboard");
+}
+
+function getRoomBudgetTotal(room: Room, modules: RoomModule[]) {
+  const baseTotal = Number(room.total_paintable_area) * Number(room.unit_price ?? 0);
+  const modulesTotal = modules.reduce((sum, module) => sum + Number(module.total), 0);
+  return baseTotal + modulesTotal;
+}
+
+function buildRoomBudgetNotes(room: Room, modules: RoomModule[]) {
+  const baseLabel =
+    room.paint_scope === "manual_area"
+      ? "Metro cuadrado"
+      : room.paint_scope === "ceiling_only"
+        ? "Solo techo"
+        : room.paint_scope === "walls_only"
+          ? "Solo paredes"
+          : "Techo y paredes";
+  const lines =
+    Number(room.total_paintable_area) > 0
+      ? [
+          `${baseLabel}: ${Number(room.total_paintable_area).toFixed(2)} m2 x ${formatCurrency(Number(room.unit_price ?? 0))} = ${formatCurrency(Number(room.total_paintable_area) * Number(room.unit_price ?? 0))}`,
+        ]
+      : [];
+
+  if (room.notes) {
+    lines.push(`Notas de la zona: ${room.notes}`);
+  }
+
+  for (const module of modules) {
+    const label = module.module_type === "free" ? module.concept : `${getModuleTypeLabel(module.module_type)} - ${module.concept}`;
+    const unit = module.unit ? ` ${module.unit}` : "";
+    lines.push(`${label}: ${Number(module.quantity)}${unit} x ${formatCurrency(Number(module.unit_price))} = ${formatCurrency(Number(module.total))}`);
+    if (module.notes) {
+      lines.push(`Notas: ${module.notes}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function getModuleTypeLabel(moduleType: RoomModule["module_type"]) {
+  if (moduleType === "ceiling_only") return "Solo techo";
+  if (moduleType === "walls_only") return "Solo paredes";
+  if (moduleType === "manual_area") return "Metro cuadrado";
+  return "Libre";
+}
+
+function isOptionalRoomModulesError(error: { code?: string } | null) {
+  if (!error) return false;
+  return error.code === "42P01" || error.code === "42703" || error.code === "42501" || error.code === "PGRST205";
 }
 
 async function getNextBudgetSortOrder(supabase: Supabase, projectId: string) {

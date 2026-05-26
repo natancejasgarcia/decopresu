@@ -6,7 +6,7 @@ import { ProjectTabs } from "@/components/ProjectTabs";
 import { sortBudgetItems } from "@/lib/budget";
 import { formatCurrency } from "@/lib/calculations";
 import { requireUserProfile } from "@/lib/auth";
-import type { BudgetItem, Message, Profile, Project, ProjectExpense, ProjectFile, ProjectPayment, Room } from "@/lib/types";
+import type { BudgetItem, Message, Profile, Project, ProjectExpense, ProjectFile, ProjectPayment, Room, RoomModule } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +32,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     { data: messageData },
     { data: fileData },
     { data: roomData },
+    { data: roomModuleData, error: roomModuleError },
     { data: budgetData },
     { data: profileData },
     { data: expenseData, error: expenseError },
@@ -40,6 +41,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     supabase.from("messages").select("*").eq("project_id", params.id).order("created_at", { ascending: true }).returns<Message[]>(),
     supabase.from("project_files").select("*").eq("project_id", params.id).order("created_at", { ascending: false }).returns<ProjectFile[]>(),
     supabase.from("rooms").select("*").eq("project_id", params.id).order("created_at", { ascending: false }).returns<Room[]>(),
+    supabase.from("room_modules").select("*").eq("project_id", params.id).order("created_at", { ascending: true }).returns<RoomModule[]>(),
     supabase.from("budget_items").select("*").eq("project_id", params.id).order("created_at", { ascending: true }).returns<BudgetItem[]>(),
     supabase.from("profiles").select("*").returns<Profile[]>(),
     supabase.from("project_expenses").select("*").eq("project_id", params.id).order("expense_date", { ascending: false }).returns<ProjectExpense[]>(),
@@ -48,7 +50,15 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
   const messages = messageData ?? [];
   const files = fileData ?? [];
-  const rooms = roomData ?? [];
+  const modules = isOptionalRoomModulesError(roomModuleError) ? [] : (roomModuleData ?? []);
+  const modulesByRoom = new Map<string, RoomModule[]>();
+  for (const module of modules) {
+    modulesByRoom.set(module.room_id, [...(modulesByRoom.get(module.room_id) ?? []), module]);
+  }
+  const rooms = (roomData ?? []).map((room) => ({
+    ...room,
+    modules: modulesByRoom.get(room.id) ?? [],
+  }));
   const budgetItems = sortBudgetItems(budgetData ?? []);
   const expenses = expenseError?.code === "42P01" ? [] : (expenseData ?? []);
   const payments = paymentError?.code === "42P01" ? [] : (paymentData ?? []);
@@ -114,4 +124,9 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
       </div>
     </main>
   );
+}
+
+function isOptionalRoomModulesError(error: { code?: string } | null) {
+  if (!error) return false;
+  return error.code === "42P01" || error.code === "42703" || error.code === "42501" || error.code === "PGRST205";
 }

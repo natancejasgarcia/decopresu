@@ -17,6 +17,17 @@ const roomSchema = z.object({
   notes: z.string().trim().optional(),
 });
 
+const roomModuleSchema = z.object({
+  project_id: z.string().uuid(),
+  room_id: z.string().uuid(),
+  module_type: z.enum(["ceiling_only", "walls_only", "manual_area", "free"]).default("free"),
+  concept: z.string().trim().min(2),
+  quantity: z.coerce.number().positive(),
+  unit: z.string().trim().default("m2"),
+  unit_price: z.coerce.number().min(0),
+  notes: z.string().trim().optional(),
+});
+
 function normalizeRoomInput(parsed: z.infer<typeof roomSchema>) {
   if (parsed.paint_scope === "manual_area") {
     return {
@@ -103,4 +114,81 @@ export async function deleteRoomAction(formData: FormData) {
     .eq("id", projectId);
 
   revalidatePath(`/projects/${projectId}`);
+}
+
+export async function createRoomModuleAction(formData: FormData) {
+  const { supabase, user } = await requireUserProfile();
+  const parsed = roomModuleSchema.parse(Object.fromEntries(formData));
+
+  const { error } = await supabase.from("room_modules").insert({
+    ...parsed,
+    unit: parsed.unit || "m2",
+    notes: parsed.notes || null,
+    created_by: user.id,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await touchProject(supabase, parsed.project_id);
+  revalidatePath(`/projects/${parsed.project_id}`);
+}
+
+export async function updateRoomModuleAction(formData: FormData) {
+  const { supabase } = await requireUserProfile();
+  const moduleId = z.string().uuid().parse(formData.get("module_id"));
+  const parsed = roomModuleSchema.parse(Object.fromEntries(formData));
+
+  const { error } = await supabase
+    .from("room_modules")
+    .update({
+      module_type: parsed.module_type,
+      concept: parsed.concept,
+      quantity: parsed.quantity,
+      unit: parsed.unit || "m2",
+      unit_price: parsed.unit_price,
+      notes: parsed.notes || null,
+    })
+    .eq("id", moduleId)
+    .eq("project_id", parsed.project_id)
+    .eq("room_id", parsed.room_id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await touchProject(supabase, parsed.project_id);
+  revalidatePath(`/projects/${parsed.project_id}`);
+}
+
+export async function deleteRoomModuleAction(formData: FormData) {
+  const { supabase } = await requireUserProfile();
+  const projectId = z.string().uuid().parse(formData.get("project_id"));
+  const roomId = z.string().uuid().parse(formData.get("room_id"));
+  const moduleId = z.string().uuid().parse(formData.get("module_id"));
+
+  const { error } = await supabase
+    .from("room_modules")
+    .delete()
+    .eq("id", moduleId)
+    .eq("project_id", projectId)
+    .eq("room_id", roomId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await touchProject(supabase, projectId);
+  revalidatePath(`/projects/${projectId}`);
+}
+
+async function touchProject(
+  supabase: Awaited<ReturnType<typeof requireUserProfile>>["supabase"],
+  projectId: string,
+) {
+  await supabase
+    .from("projects")
+    .update({ last_activity_at: new Date().toISOString() })
+    .eq("id", projectId);
 }
