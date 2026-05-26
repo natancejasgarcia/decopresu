@@ -143,7 +143,7 @@ export function RoomCalculator({ projectId, rooms }: RoomCalculatorProps) {
       <div className="section-heading">
         <div>
           <h2>Plano por habitaciones</h2>
-          <p className="mt-1 text-sm font-semibold text-muted">Cada habitacion es una partida, y dentro puedes anadir modulos o subpartes.</p>
+          <p className="mt-1 text-sm font-semibold text-muted">Primero crea una habitacion o zona. Despues, dentro de esa tarjeta, podras anadir modulos: techo, paredes, m2 o libre.</p>
         </div>
         <span className="rounded-full bg-paper px-3 py-1 text-sm font-black text-moss">
           {projectTotal.toFixed(2)} m2
@@ -184,7 +184,12 @@ export function RoomCalculator({ projectId, rooms }: RoomCalculatorProps) {
 
       <div className="mt-5 grid gap-3">
         {rooms.length === 0 ? (
-          <p className="rounded-lg bg-paper p-4 text-sm text-muted">Anade habitaciones o zonas para calcular los metros del proyecto.</p>
+          <div className="rounded-lg border border-dashed border-line bg-paper p-4">
+            <p className="text-sm font-black text-ink">Aun no hay habitaciones o zonas.</p>
+            <p className="mt-1 text-sm font-semibold text-muted">
+              Anade una habitacion arriba. Cuando se cree, aparecera aqui su tarjeta con el boton <strong>Anadir modulo</strong> para meter subpartes como libre, solo techo, solo paredes o metros directos.
+            </p>
+          </div>
         ) : (
           rooms.map((room) => {
             const roomTotal = Number(room.total_paintable_area);
