@@ -10,7 +10,7 @@ type Supabase = Awaited<ReturnType<typeof requireUserProfile>>["supabase"];
 
 const budgetItemSchema = z.object({
   project_id: z.string().uuid(),
-  concept: z.string().trim().min(2),
+  concept: z.string().trim().min(1),
   notes: z.string().trim().optional(),
   quantity: z.preprocess((value) => (value === "" || value === null ? 1 : normalizeDecimalInput(value)), z.coerce.number().positive()),
   unit: z.preprocess((value) => (typeof value === "string" ? value.trim() : ""), z.string()),
@@ -22,7 +22,7 @@ export async function createBudgetItemAction(formData: FormData) {
   const parsed = budgetItemSchema.safeParse(Object.fromEntries(formData));
 
   if (!parsed.success) {
-    return { ok: false, error: "Revisa concepto, cantidad y precio. Puedes usar coma o punto en los decimales." };
+    return { ok: false, error: "Revisa que concepto, cantidad y precio tengan valor. Puedes usar coma o punto en los decimales." };
   }
 
   const sortOrder = await getNextBudgetSortOrder(supabase, parsed.data.project_id);
