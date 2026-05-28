@@ -12,9 +12,9 @@ const budgetItemSchema = z.object({
   project_id: z.string().uuid(),
   concept: z.string().trim().min(2),
   notes: z.string().trim().optional(),
-  quantity: z.preprocess((value) => (value === "" || value === null ? 1 : value), z.coerce.number().positive()),
+  quantity: z.preprocess((value) => (value === "" || value === null ? 1 : normalizeDecimalInput(value)), z.coerce.number().positive()),
   unit: z.preprocess((value) => (typeof value === "string" ? value.trim() : ""), z.string()),
-  unit_price: z.coerce.number().min(0),
+  unit_price: z.preprocess(normalizeDecimalInput, z.coerce.number().min(0)),
 });
 
 export async function createBudgetItemAction(formData: FormData) {
@@ -22,7 +22,7 @@ export async function createBudgetItemAction(formData: FormData) {
   const parsed = budgetItemSchema.safeParse(Object.fromEntries(formData));
 
   if (!parsed.success) {
-    return;
+    return { ok: false, error: "Revisa concepto, cantidad y precio. Puedes usar coma o punto en los decimales." };
   }
 
   const sortOrder = await getNextBudgetSortOrder(supabase, parsed.data.project_id);
@@ -35,7 +35,7 @@ export async function createBudgetItemAction(formData: FormData) {
   ]);
 
   if (error) {
-    throw new Error(error.message);
+    return { ok: false, error: error.message };
   }
 
   await supabase
@@ -45,6 +45,7 @@ export async function createBudgetItemAction(formData: FormData) {
 
   revalidatePath(`/projects/${parsed.data.project_id}`);
   revalidatePath("/dashboard");
+  return { ok: true };
 }
 
 export async function updateBudgetItemAction(formData: FormData) {
@@ -249,6 +250,16 @@ function getModuleTypeLabel(moduleType: RoomModule["module_type"]) {
 function isOptionalRoomModulesError(error: { code?: string } | null) {
   if (!error) return false;
   return error.code === "42P01" || error.code === "42703" || error.code === "42501" || error.code === "PGRST205";
+}
+
+function normalizeDecimalInput(value: unknown) {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  if (trimmed.includes(",")) {
+    return trimmed.replace(/\./g, "").replace(",", ".");
+  }
+  return trimmed;
 }
 
 async function getNextBudgetSortOrder(supabase: Supabase, projectId: string) {

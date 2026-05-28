@@ -50,6 +50,7 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editIsFixedPrice, setEditIsFixedPrice] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const total = useMemo(() => items.reduce((sum, item) => sum + Number(item.total), 0), [items]);
   const roomArea = useMemo(
     () => rooms.reduce((sum, room) => sum + Number(room.total_paintable_area) + getRoomModulesArea(room), 0),
@@ -69,7 +70,12 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
     const form = event.currentTarget;
     const formData = new FormData(form);
     startTransition(async () => {
-      await createBudgetItemAction(formData);
+      setFormError(null);
+      const result = await createBudgetItemAction(formData);
+      if (!result?.ok) {
+        setFormError(result?.error ?? "No se pudo anadir la linea.");
+        return;
+      }
       form.reset();
       setIsFixedPrice(false);
       router.refresh();
@@ -241,6 +247,9 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
           <ReceiptText size={18} />
           Anadir linea
         </button>
+        {formError ? (
+          <p className="rounded-lg bg-red-50 p-3 text-sm font-black text-red-700">{formError}</p>
+        ) : null}
       </form>
 
       <div className="mt-5 grid gap-2">
