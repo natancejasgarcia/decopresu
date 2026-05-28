@@ -26,12 +26,16 @@ export async function createBudgetItemAction(formData: FormData) {
   }
 
   const sortOrder = await getNextBudgetSortOrder(supabase, parsed.data.project_id);
+  const createdAt = new Date().toISOString();
+  const itemId = crypto.randomUUID();
+  const row = {
+    id: itemId,
+    ...parsed.data,
+    notes: parsed.data.notes || null,
+    sort_order: sortOrder,
+  };
   const { error } = await insertBudgetRows(supabase, [
-    {
-      ...parsed.data,
-      notes: parsed.data.notes || null,
-      sort_order: sortOrder,
-    },
+    row,
   ]);
 
   if (error) {
@@ -45,7 +49,21 @@ export async function createBudgetItemAction(formData: FormData) {
 
   revalidatePath(`/projects/${parsed.data.project_id}`);
   revalidatePath("/dashboard");
-  return { ok: true };
+  return {
+    ok: true,
+    item: {
+      id: itemId,
+      project_id: parsed.data.project_id,
+      concept: parsed.data.concept,
+      notes: parsed.data.notes || null,
+      quantity: parsed.data.quantity,
+      unit: parsed.data.unit,
+      unit_price: parsed.data.unit_price,
+      total: Math.round(parsed.data.quantity * parsed.data.unit_price * 100) / 100,
+      sort_order: sortOrder,
+      created_at: createdAt,
+    },
+  };
 }
 
 export async function updateBudgetItemAction(formData: FormData) {
@@ -275,11 +293,12 @@ async function getNextBudgetSortOrder(supabase: Supabase, projectId: string) {
 }
 
 async function insertBudgetRows(supabase: Supabase, rows: Array<Record<string, unknown>>) {
-  const result = await supabase.from("budget_items").insert(rows);
+  const createdRows: Array<Record<string, unknown>> = rows.map((row) => ({ created_at: new Date().toISOString(), ...row }));
+  const result = await supabase.from("budget_items").insert(createdRows);
 
   if (result.error?.code === "PGRST204" || result.error?.code === "42703") {
-    const rowsWithoutOrder = rows.map(({ sort_order: _sortOrder, ...row }) => row);
-    return supabase.from("budget_items").insert(rowsWithoutOrder);
+    const rowsWithoutOptionalColumns = createdRows.map(({ sort_order: _sortOrder, notes: _notes, ...row }) => row);
+    return supabase.from("budget_items").insert(rowsWithoutOptionalColumns);
   }
 
   return result;

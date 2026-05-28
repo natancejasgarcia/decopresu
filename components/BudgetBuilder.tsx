@@ -51,7 +51,7 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editIsFixedPrice, setEditIsFixedPrice] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const total = useMemo(() => items.reduce((sum, item) => sum + Number(item.total), 0), [items]);
+  const total = useMemo(() => orderedItems.reduce((sum, item) => sum + Number(item.total), 0), [orderedItems]);
   const roomArea = useMemo(
     () => rooms.reduce((sum, room) => sum + Number(room.total_paintable_area) + getRoomModulesArea(room), 0),
     [rooms],
@@ -75,6 +75,9 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
       if (!result?.ok) {
         setFormError(result?.error ?? "No se pudo anadir la linea.");
         return;
+      }
+      if (result.item) {
+        setOrderedItems((currentItems) => sortBudgetItems([...currentItems, result.item]));
       }
       form.reset();
       setIsFixedPrice(false);
