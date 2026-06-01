@@ -38,13 +38,16 @@ export function FileUploader({ projectId, files }: FileUploaderProps) {
         <input type="hidden" name="project_id" value={projectId} />
         <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line bg-white px-3 text-sm font-bold text-muted">
           <ImagePlus size={19} />
-          <input className="w-full text-sm" name="file" type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" required />
+          <input className="w-full text-sm" name="files" type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" multiple required />
         </label>
         <button className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-moss px-4 font-black text-white disabled:opacity-60" disabled={isPending}>
           <Upload size={18} />
-          Subir
+          {isPending ? "Subiendo..." : "Subir archivos"}
         </button>
       </form>
+      <p className="mt-2 text-xs font-semibold text-muted">
+        Puedes seleccionar varias fotos o documentos a la vez.
+      </p>
 
       <div className="mt-5">
         <h3 className="text-sm font-black uppercase text-muted">Galeria</h3>

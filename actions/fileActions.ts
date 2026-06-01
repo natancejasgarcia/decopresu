@@ -9,36 +9,43 @@ const MAX_FILE_SIZE = 15 * 1024 * 1024;
 export async function uploadProjectFileAction(formData: FormData) {
   const { supabase, user } = await requireUserProfile();
   const projectId = z.string().uuid().parse(formData.get("project_id"));
-  const file = formData.get("file");
+  const files = formData.getAll("files").filter((value): value is File => value instanceof File && value.size > 0);
 
-  if (!(file instanceof File) || file.size === 0) {
-    throw new Error("Selecciona un archivo.");
+  if (files.length === 0) {
+    throw new Error("Selecciona al menos un archivo.");
   }
 
-  if (file.size > MAX_FILE_SIZE) {
-    throw new Error("El archivo supera el limite de 15 MB.");
+  const oversizedFile = files.find((file) => file.size > MAX_FILE_SIZE);
+  if (oversizedFile) {
+    throw new Error(`${oversizedFile.name} supera el limite de 15 MB.`);
   }
 
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-  const path = `${projectId}/${crypto.randomUUID()}-${safeName}`;
-  const { error: uploadError } = await supabase.storage
-    .from("project-files")
-    .upload(path, file, {
-      contentType: file.type || "application/octet-stream",
-      upsert: false,
+  const uploadedRows = [];
+
+  for (const file of files) {
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+    const path = `${projectId}/${crypto.randomUUID()}-${safeName}`;
+    const { error: uploadError } = await supabase.storage
+      .from("project-files")
+      .upload(path, file, {
+        contentType: file.type || "application/octet-stream",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      throw new Error(uploadError.message);
+    }
+
+    uploadedRows.push({
+      project_id: projectId,
+      uploaded_by: user.id,
+      file_name: file.name,
+      file_url: path,
+      file_type: file.type || "application/octet-stream",
     });
-
-  if (uploadError) {
-    throw new Error(uploadError.message);
   }
 
-  const { error } = await supabase.from("project_files").insert({
-    project_id: projectId,
-    uploaded_by: user.id,
-    file_name: file.name,
-    file_url: path,
-    file_type: file.type || "application/octet-stream",
-  });
+  const { error } = await supabase.from("project_files").insert(uploadedRows);
 
   if (error) {
     throw new Error(error.message);
