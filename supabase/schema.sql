@@ -174,6 +174,9 @@ create table if not exists public.project_expenses (
   expense_date date not null default current_date,
   is_paid boolean not null default true,
   notes text,
+  receipt_file_name text,
+  receipt_file_url text,
+  receipt_file_type text,
   created_by uuid not null references public.profiles(user_id) on delete cascade,
   created_at timestamptz not null default now()
 );

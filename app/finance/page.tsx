@@ -41,6 +41,7 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
     throw new Error(expensesError?.message ?? paymentsError?.message ?? fixedCostsError?.message);
   }
 
+  const expensesWithSignedReceipts = await signExpenseReceipts(supabase, financeTablesUnavailable ? [] : (expenses ?? []));
   const paymentsWithSignedReceipts = await signPaymentReceipts(supabase, financeTablesUnavailable ? [] : (payments ?? []));
 
   return (
@@ -50,7 +51,7 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
         <FinanceDashboard
           projects={projects ?? []}
           budgetItems={sortBudgetItems(budgetItems ?? [])}
-          expenses={financeTablesUnavailable ? [] : (expenses ?? [])}
+          expenses={expensesWithSignedReceipts}
           payments={paymentsWithSignedReceipts}
           fixedCosts={financeTablesUnavailable ? [] : (fixedCosts ?? [])}
           year={year}
@@ -77,6 +78,20 @@ async function signPaymentReceipts(
 
       const { data } = await supabase.storage.from("project-files").createSignedUrl(payment.receipt_file_url, 60 * 60);
       return { ...payment, receipt_signed_url: data?.signedUrl };
+    }),
+  );
+}
+
+async function signExpenseReceipts(
+  supabase: Awaited<ReturnType<typeof requireUserProfile>>["supabase"],
+  expenses: ProjectExpense[],
+) {
+  return Promise.all(
+    expenses.map(async (expense) => {
+      if (!expense.receipt_file_url) return expense;
+
+      const { data } = await supabase.storage.from("project-files").createSignedUrl(expense.receipt_file_url, 60 * 60);
+      return { ...expense, receipt_signed_url: data?.signedUrl };
     }),
   );
 }

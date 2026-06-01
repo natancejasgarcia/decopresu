@@ -55,12 +55,18 @@ export async function createExpenseAction(formData: FormData) {
 
   if (!parsed.success) return;
 
-  const { error } = await supabase.from("project_expenses").insert({
+  const { data: expense, error } = await supabase.from("project_expenses").insert({
     ...parsed.data,
     created_by: user.id,
-  });
+  }).select("id, project_id").single<{ id: string; project_id: string | null }>();
 
   if (error) throw new Error(error.message);
+
+  const receiptResult = await attachFinanceReceipt(supabase, "project_expenses", expense.id, parsed.data.project_id, formData.get("receipt"));
+
+  if (!receiptResult.ok) {
+    throw new Error(`El gasto se guardo, pero el adjunto no: ${receiptResult.error}`);
+  }
 
   if (parsed.data.project_id) {
     await touchProject(supabase, parsed.data.project_id);
@@ -76,9 +82,19 @@ export async function deleteExpenseAction(formData: FormData) {
   const expenseId = z.string().uuid().parse(formData.get("expense_id"));
   const projectId = optionalUuid.parse(formData.get("project_id"));
 
+  const { data: expense } = await supabase
+    .from("project_expenses")
+    .select("receipt_file_url")
+    .eq("id", expenseId)
+    .maybeSingle<{ receipt_file_url: string | null }>();
+
   const { error } = await supabase.from("project_expenses").delete().eq("id", expenseId);
 
   if (error) throw new Error(error.message);
+
+  if (expense?.receipt_file_url) {
+    await supabase.storage.from("project-files").remove([expense.receipt_file_url]);
+  }
 
   if (projectId) {
     await touchProject(supabase, projectId);
@@ -104,7 +120,7 @@ export async function createPaymentAction(formData: FormData): Promise<FinanceAc
 
   if (error) return actionError(friendlyFinanceError(error.message));
 
-  const receiptResult = await attachPaymentReceipt(supabase, payment.id, parsed.data.project_id, formData.get("receipt"));
+  const receiptResult = await attachFinanceReceipt(supabase, "project_payments", payment.id, parsed.data.project_id, formData.get("receipt"));
 
   if (parsed.data.project_id) {
     await touchProject(supabase, parsed.data.project_id);
@@ -116,7 +132,7 @@ export async function createPaymentAction(formData: FormData): Promise<FinanceAc
   if (!receiptResult.ok) {
     return {
       ok: false,
-      error: `El cobro se guardó, pero el PDF no: ${receiptResult.error}`,
+      error: `El cobro se guardo, pero el adjunto no: ${receiptResult.error}`,
     };
   }
 
@@ -149,7 +165,7 @@ export async function updatePaymentAction(formData: FormData): Promise<FinanceAc
 
   if (error) return actionError(friendlyFinanceError(error.message));
 
-  const receiptResult = await attachPaymentReceipt(supabase, paymentId, parsed.data.project_id, formData.get("receipt"));
+  const receiptResult = await attachFinanceReceipt(supabase, "project_payments", paymentId, parsed.data.project_id, formData.get("receipt"));
 
   if (parsed.data.project_id) {
     await touchProject(supabase, parsed.data.project_id);
@@ -161,7 +177,7 @@ export async function updatePaymentAction(formData: FormData): Promise<FinanceAc
   if (!receiptResult.ok) {
     return {
       ok: false,
-      error: `El cobro se guardó, pero el PDF no: ${receiptResult.error}`,
+      error: `El cobro se guardo, pero el adjunto no: ${receiptResult.error}`,
     };
   }
 
@@ -173,9 +189,19 @@ export async function deletePaymentAction(formData: FormData) {
   const paymentId = z.string().uuid().parse(formData.get("payment_id"));
   const projectId = optionalUuid.parse(formData.get("project_id"));
 
+  const { data: payment } = await supabase
+    .from("project_payments")
+    .select("receipt_file_url")
+    .eq("id", paymentId)
+    .maybeSingle<{ receipt_file_url: string | null }>();
+
   const { error } = await supabase.from("project_payments").delete().eq("id", paymentId);
 
   if (error) throw new Error(error.message);
+
+  if (payment?.receipt_file_url) {
+    await supabase.storage.from("project-files").remove([payment.receipt_file_url]);
+  }
 
   if (projectId) {
     await touchProject(supabase, projectId);
@@ -219,7 +245,7 @@ async function touchProject(supabase: Awaited<ReturnType<typeof requireUserProfi
     .eq("id", projectId);
 }
 
-async function uploadPaymentReceipt(
+async function uploadFinanceReceipt(
   supabase: Awaited<ReturnType<typeof requireUserProfile>>["supabase"],
   projectId: string | null,
   value: FormDataEntryValue | null,
@@ -227,18 +253,20 @@ async function uploadPaymentReceipt(
   if (!isUploadedFile(value)) return { ok: true, data: null };
 
   if (value.size > MAX_RECEIPT_FILE_SIZE) {
-    return { ok: false, error: "el PDF supera el limite de 10 MB." };
+    return { ok: false, error: "el archivo supera el limite de 10 MB." };
   }
 
-  if (value.type !== "application/pdf" && !value.name.toLowerCase().endsWith(".pdf")) {
-    return { ok: false, error: "el justificante tiene que ser un PDF." };
+  const isPdf = value.type === "application/pdf" || value.name.toLowerCase().endsWith(".pdf");
+  const isImage = value.type.startsWith("image/");
+  if (!isPdf && !isImage) {
+    return { ok: false, error: "el justificante tiene que ser PDF o imagen." };
   }
 
   const safeName = value.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-  const folder = projectId ?? "cobros-varios";
-  const path = `${folder}/payments/${crypto.randomUUID()}-${safeName}`;
+  const folder = projectId ?? "finanzas-varias";
+  const path = `${folder}/finance-receipts/${crypto.randomUUID()}-${safeName}`;
   const { error } = await supabase.storage.from("project-files").upload(path, value, {
-    contentType: value.type || "application/pdf",
+    contentType: value.type || "application/octet-stream",
     upsert: false,
   });
 
@@ -251,7 +279,7 @@ async function uploadPaymentReceipt(
     data: {
       receipt_file_name: value.name,
       receipt_file_url: path,
-      receipt_file_type: value.type || "application/pdf",
+      receipt_file_type: value.type || "application/octet-stream",
     },
   };
 }
@@ -260,13 +288,14 @@ function isUploadedFile(value: FormDataEntryValue | null): value is File {
   return typeof File !== "undefined" && value instanceof File && value.size > 0;
 }
 
-async function attachPaymentReceipt(
+async function attachFinanceReceipt(
   supabase: Awaited<ReturnType<typeof requireUserProfile>>["supabase"],
-  paymentId: string,
+  table: "project_payments" | "project_expenses",
+  rowId: string,
   projectId: string | null,
   value: FormDataEntryValue | null,
 ): Promise<FinanceActionResult> {
-  const receiptResult = await uploadPaymentReceipt(supabase, projectId, value);
+  const receiptResult = await uploadFinanceReceipt(supabase, projectId, value);
 
   if (!receiptResult.ok) {
     return { ok: false, error: receiptResult.error };
@@ -277,9 +306,9 @@ async function attachPaymentReceipt(
   }
 
   const { error } = await supabase
-    .from("project_payments")
+    .from(table)
     .update(receiptResult.data)
-    .eq("id", paymentId);
+    .eq("id", rowId);
 
   if (error) {
     return { ok: false, error: friendlyFinanceError(error.message) };
@@ -295,7 +324,7 @@ function actionError(error: string): FinanceActionResult {
 
 function friendlyFinanceError(message: string) {
   if (message.includes("receipt_file")) {
-    return "faltan las columnas del PDF en Supabase. Ejecuta la migración 20260519_payment_receipts.sql.";
+    return "faltan las columnas del justificante en Supabase. Ejecuta las migraciones de recibos de cobros y gastos.";
   }
 
   if (message.toLowerCase().includes("row-level security") || message.toLowerCase().includes("policy")) {

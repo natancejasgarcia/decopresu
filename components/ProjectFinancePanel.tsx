@@ -141,7 +141,7 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
       </div>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <form onSubmit={submitExpense} className="grid gap-3 rounded-lg bg-paper p-3">
+        <form onSubmit={submitExpense} encType="multipart/form-data" className="grid gap-3 rounded-lg bg-paper p-3">
           <input type="hidden" name="project_id" value={projectId} />
           <div className="flex items-center gap-2">
             <ReceiptText size={18} className="text-moss" />
@@ -178,10 +178,14 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
             Pagado
           </label>
           <textarea className="form-input min-h-20" name="notes" placeholder="Notas del ticket, color, material..." />
+          <div>
+            <label className="form-label" htmlFor="expense-receipt">Justificante PDF o imagen</label>
+            <input className="form-input file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-black file:text-white" id="expense-receipt" name="receipt" type="file" accept="image/*,application/pdf,.pdf" />
+          </div>
           <button className="h-11 rounded-lg bg-moss font-black text-white disabled:opacity-60" disabled={isPending}>Guardar gasto</button>
         </form>
 
-        <form onSubmit={submitPayment} className="grid gap-3 rounded-lg bg-paper p-3">
+        <form onSubmit={submitPayment} encType="multipart/form-data" className="grid gap-3 rounded-lg bg-paper p-3">
           <input type="hidden" name="project_id" value={projectId} />
           <div className="flex items-center gap-2">
             <CreditCard size={18} className="text-moss" />
@@ -207,8 +211,8 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
           </div>
           <textarea className="form-input min-h-20" name="notes" placeholder="Transferencia, senal, pago final..." />
           <div>
-            <label className="form-label" htmlFor="payment-receipt">PDF justificante</label>
-            <input className="form-input file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-black file:text-white" id="payment-receipt" name="receipt" type="file" accept="application/pdf,.pdf" />
+            <label className="form-label" htmlFor="payment-receipt">Justificante PDF o imagen</label>
+            <input className="form-input file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-black file:text-white" id="payment-receipt" name="receipt" type="file" accept="image/*,application/pdf,.pdf" />
           </div>
           <button className="h-11 rounded-lg bg-moss font-black text-white disabled:opacity-60" disabled={isPending}>Guardar cobro</button>
         </form>
@@ -224,6 +228,8 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
             meta: `${expense.category}${expense.supplier ? ` - ${expense.supplier}` : ""} - ${expense.expense_date}`,
             amount: Number(expense.amount),
             notes: expense.notes,
+            receiptName: expense.receipt_file_name,
+            receiptUrl: expense.receipt_signed_url,
             onDelete: () => removeExpense(expense.id),
           }))}
           isPending={isPending}
@@ -277,7 +283,7 @@ function FinanceList({
 }: {
   title: string;
   empty: string;
-  rows: ProjectPayment[] | Array<{ id: string; title: string; meta: string; amount: number; notes?: string | null; onDelete: () => void }>;
+  rows: ProjectPayment[] | Array<{ id: string; title: string; meta: string; amount: number; notes?: string | null; receiptName?: string | null; receiptUrl?: string; onDelete: () => void }>;
   isPending: boolean;
   projectId?: string;
   editingPaymentId?: string | null;
@@ -323,11 +329,11 @@ function FinanceList({
                       </div>
                       <textarea className="form-input min-h-20" name="notes" defaultValue={row.notes ?? ""} placeholder="Notas del cobro..." />
                       <div>
-                        <label className="form-label" htmlFor={`payment-edit-receipt-${row.id}`}>Nuevo PDF justificante</label>
-                        <input className="form-input file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-black file:text-white" id={`payment-edit-receipt-${row.id}`} name="receipt" type="file" accept="application/pdf,.pdf" />
+                        <label className="form-label" htmlFor={`payment-edit-receipt-${row.id}`}>Nuevo justificante PDF o imagen</label>
+                        <input className="form-input file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-black file:text-white" id={`payment-edit-receipt-${row.id}`} name="receipt" type="file" accept="image/*,application/pdf,.pdf" />
                         {row.receipt_signed_url ? (
                           <a className="mt-2 inline-flex text-xs font-black text-moss underline" href={row.receipt_signed_url} target="_blank" rel="noreferrer">
-                            Ver PDF actual
+                            Ver adjunto actual
                           </a>
                         ) : null}
                       </div>
@@ -350,7 +356,7 @@ function FinanceList({
                         {row.notes ? <p className="mt-1 text-sm text-muted">{row.notes}</p> : null}
                         {row.receipt_signed_url ? (
                           <a className="mt-1 inline-flex text-xs font-black text-moss underline" href={row.receipt_signed_url} target="_blank" rel="noreferrer">
-                            Ver PDF {row.receipt_file_name ? `- ${row.receipt_file_name}` : ""}
+                            Ver adjunto {row.receipt_file_name ? `- ${row.receipt_file_name}` : ""}
                           </a>
                         ) : null}
                       </div>
@@ -367,7 +373,7 @@ function FinanceList({
               );
             }
 
-            const expenseRow = row as { id: string; title: string; meta: string; amount: number; notes?: string | null; onDelete: () => void };
+            const expenseRow = row as { id: string; title: string; meta: string; amount: number; notes?: string | null; receiptName?: string | null; receiptUrl?: string; onDelete: () => void };
 
             return (
               <article key={expenseRow.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-line p-3">
@@ -375,6 +381,11 @@ function FinanceList({
                   <strong className="block text-sm text-ink">{expenseRow.title}</strong>
                   <p className="text-xs font-semibold text-muted">{expenseRow.meta}</p>
                   {expenseRow.notes ? <p className="mt-1 text-sm text-muted">{expenseRow.notes}</p> : null}
+                  {expenseRow.receiptUrl ? (
+                    <a className="mt-1 inline-flex text-xs font-black text-moss underline" href={expenseRow.receiptUrl} target="_blank" rel="noreferrer">
+                      Ver adjunto {expenseRow.receiptName ? `- ${expenseRow.receiptName}` : ""}
+                    </a>
+                  ) : null}
                 </div>
                 <strong className="whitespace-nowrap text-ink">{formatCurrency(expenseRow.amount)}</strong>
                 <button

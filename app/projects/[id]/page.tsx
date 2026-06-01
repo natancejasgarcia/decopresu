@@ -83,6 +83,14 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
       return { ...payment, receipt_signed_url: data?.signedUrl };
     }),
   );
+  const expensesWithSignedReceipts = await Promise.all(
+    expenses.map(async (expense) => {
+      if (!expense.receipt_file_url) return expense;
+
+      const { data } = await supabase.storage.from("project-files").createSignedUrl(expense.receipt_file_url, 60 * 60);
+      return { ...expense, receipt_signed_url: data?.signedUrl };
+    }),
+  );
 
   const totalBudget = budgetItems.reduce((sum, item) => sum + Number(item.total), 0);
 
@@ -118,7 +126,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           files={filesWithSignedUrls}
           rooms={rooms}
           budgetItems={budgetItems}
-          expenses={expenses}
+          expenses={expensesWithSignedReceipts}
           payments={paymentsWithSignedReceipts}
         />
       </div>

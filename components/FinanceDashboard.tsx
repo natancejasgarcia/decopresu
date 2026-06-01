@@ -103,7 +103,7 @@ export function FinanceDashboard({ projects, budgetItems, expenses, payments, fi
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="grid gap-4">
           <FinanceFormPanel title="Anadir gasto o material" icon={<ReceiptText size={18} />}>
-            <form action={createExpenseAction} className="grid gap-3">
+            <form action={createExpenseAction} encType="multipart/form-data" className="grid gap-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Concepto">
                   <input className="form-input" name="concept" placeholder="Pintura, lijas, gasolina..." required />
@@ -138,6 +138,9 @@ export function FinanceDashboard({ projects, budgetItems, expenses, payments, fi
                 Pagado
               </label>
               <textarea className="form-input min-h-20" name="notes" placeholder="Notas, ticket, material..." />
+              <Field label="Justificante PDF o imagen">
+                <input className="form-input file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-black file:text-white" name="receipt" type="file" accept="image/*,application/pdf,.pdf" />
+              </Field>
               <button className="h-11 rounded-lg bg-moss font-black text-white">Guardar gasto</button>
             </form>
           </FinanceFormPanel>
@@ -168,8 +171,8 @@ export function FinanceDashboard({ projects, budgetItems, expenses, payments, fi
                 </Field>
               </div>
               <textarea className="form-input min-h-20" name="notes" placeholder="Senal, pago final, transferencia..." />
-              <Field label="PDF justificante">
-                <input className="form-input file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-black file:text-white" name="receipt" type="file" accept="application/pdf,.pdf" />
+              <Field label="Justificante PDF o imagen">
+                <input className="form-input file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-black file:text-white" name="receipt" type="file" accept="image/*,application/pdf,.pdf" />
               </Field>
               <button className="h-11 rounded-lg bg-moss font-black text-white">Guardar cobro</button>
             </form>
@@ -270,6 +273,8 @@ export function FinanceDashboard({ projects, budgetItems, expenses, payments, fi
               amount={Number(expense.amount)}
               deleteAction={deleteExpenseAction}
               hiddenInputs={{ expense_id: expense.id, project_id: expense.project_id ?? "" }}
+              receiptName={expense.receipt_file_name}
+              receiptUrl={expense.receipt_signed_url}
             />
           ))}
         </DataPanel>
@@ -527,7 +532,7 @@ function FinanceRow({
         <p className="text-xs font-semibold text-muted">{meta}</p>
         {receiptUrl ? (
           <a className="mt-1 inline-flex text-xs font-black text-moss underline" href={receiptUrl} target="_blank" rel="noreferrer">
-            Ver PDF {receiptName ? `- ${receiptName}` : ""}
+            Ver adjunto {receiptName ? `- ${receiptName}` : ""}
           </a>
         ) : null}
       </div>
