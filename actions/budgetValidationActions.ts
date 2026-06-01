@@ -64,12 +64,11 @@ export async function createBudgetValidationAction(formData: FormData) {
 export async function validateBudgetAction(formData: FormData) {
   const { supabase, user } = await requireUserProfile();
   const validationId = z.string().uuid().parse(formData.get("validation_id"));
-  const validationNotes = optionalNotes.parse(formData.get("validation_notes"));
 
   const { error } = await supabase
     .from("budget_validations")
     .update({
-      validation_notes: validationNotes,
+      validation_notes: null,
       is_validated: true,
       validated_by: user.id,
       validated_at: new Date().toISOString(),

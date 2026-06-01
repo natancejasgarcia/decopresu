@@ -134,7 +134,7 @@ function ValidationRow({ validation }: { validation: BudgetValidation }) {
           </div>
         </div>
           <div className="flex shrink-0 items-center gap-2">
-            {validation.is_validated ? (
+            {validation.is_validated && !validation.validation_notes ? (
               <span className="inline-flex h-10 items-center justify-center rounded-lg bg-emerald-100 px-4 text-sm font-black text-emerald-900">
                 OK
               </span>
@@ -181,10 +181,9 @@ function ValidationRow({ validation }: { validation: BudgetValidation }) {
           </button>
         </form>
 
-        {!validation.is_validated ? (
+        {!validation.is_validated || validation.validation_notes ? (
           <form action={validateBudgetAction} className="grid gap-2">
             <input type="hidden" name="validation_id" value={validation.id} />
-            <input type="hidden" name="validation_notes" value={validation.validation_notes ?? ""} />
             <button className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 text-sm font-black text-white" type="submit">
               <CheckCircle2 size={17} />
               Validar con OK
