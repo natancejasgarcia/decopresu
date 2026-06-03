@@ -93,16 +93,16 @@ export default async function DashboardPage() {
   return (
     <main className="min-h-screen pb-24">
       <TopBar profile={profile} />
-      <div className="mx-auto max-w-5xl px-4 py-6">
-        <div className="mb-5">
+      <div className="mx-auto max-w-5xl px-3 py-3 sm:px-4 sm:py-6">
+        <div className="mb-3 sm:mb-5">
           <p className="text-xs font-black uppercase text-clay">Inicio</p>
-          <h1 className="mt-1 text-3xl font-black leading-tight text-ink sm:text-4xl">Panel Decoralia</h1>
-          <p className="mt-2 max-w-2xl text-sm font-semibold text-muted">
+          <h1 className="mt-1 text-2xl font-black leading-tight text-ink sm:text-4xl">Panel Decoralia</h1>
+          <p className="mt-1 hidden max-w-2xl text-sm font-semibold text-muted sm:block">
             Elige que quieres hacer. Botones grandes, directos y pensados para usar rapido desde el movil.
           </p>
         </div>
 
-        <section className="grid gap-3 sm:grid-cols-2">
+        <section className="grid grid-cols-2 gap-2 sm:gap-3">
           {menuItems.map((item) => {
             const Icon = item.icon;
 
@@ -110,20 +110,20 @@ export default async function DashboardPage() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`group flex min-h-36 flex-col justify-between rounded-xl border border-line p-5 shadow-soft transition hover:-translate-y-0.5 hover:shadow-lg ${item.tone}`}
+                className={`group flex aspect-square flex-col justify-between rounded-xl border border-line p-3 shadow-soft transition hover:-translate-y-0.5 hover:shadow-lg sm:aspect-auto sm:min-h-36 sm:p-5 ${item.tone}`}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl ${item.iconTone}`}>
-                    <Icon size={24} />
+                  <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl sm:h-12 sm:w-12 ${item.iconTone}`}>
+                    <Icon size={22} />
                   </div>
-                  <span className="rounded-full bg-paper px-3 py-1 text-xs font-black text-ink">{item.badge}</span>
+                  <span className="max-w-20 truncate rounded-full bg-paper px-2 py-1 text-[10px] font-black text-ink sm:max-w-none sm:px-3 sm:text-xs">{item.badge}</span>
                 </div>
-                <div className="mt-6">
+                <div className="mt-3 sm:mt-6">
                   <div className="flex items-center justify-between gap-3">
-                    <h2 className="text-xl font-black">{item.title}</h2>
-                    <ArrowRight size={20} className="shrink-0 transition group-hover:translate-x-1" />
+                    <h2 className="text-base font-black leading-tight sm:text-xl">{item.title}</h2>
+                    <ArrowRight size={18} className="hidden shrink-0 transition group-hover:translate-x-1 sm:block" />
                   </div>
-                  <p className={`mt-2 text-sm font-semibold ${item.tone.includes("bg-moss") ? "text-white/80" : "text-muted"}`}>
+                  <p className={`mt-2 hidden text-sm font-semibold sm:block ${item.tone.includes("bg-moss") ? "text-white/80" : "text-muted"}`}>
                     {item.detail}
                   </p>
                 </div>
