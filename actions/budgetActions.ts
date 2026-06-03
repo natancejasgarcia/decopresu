@@ -148,28 +148,7 @@ export async function generateBudgetItemsWithAIAction(formData: FormData) {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model: process.env.OPENAI_MODEL ?? "gpt-4o",
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
-            "Eres un presupuestador experto para Decoralia Pintores. Analizas toda la informacion disponible de una obra, sacas una conclusion profesional de lo que hay que hacer y la conviertes en partidas editables de presupuesto. Responde solo JSON valido.",
-        },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: prompt },
-            ...imageUrls.map((url) => ({
-              type: "image_url",
-              image_url: { url },
-            })),
-          ],
-        },
-      ],
-    }),
+    body: JSON.stringify(buildOpenAIBudgetRequest(prompt, imageUrls)),
   });
 
   if (!response.ok) {
@@ -178,7 +157,34 @@ export async function generateBudgetItemsWithAIAction(formData: FormData) {
   }
 
   const completion = await response.json();
-  const content = completion?.choices?.[0]?.message?.content;
+  let content = extractOpenAIMessageContent(completion);
+  if (!content) {
+    console.log("[Decoralia AI budget] Empty OpenAI completion:", JSON.stringify(summarizeOpenAICompletion(completion)).slice(0, 5000));
+    if (imageUrls.length > 0) {
+      const retryResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(buildOpenAIBudgetRequest(`${prompt}\n\nGenera el presupuesto solo con el texto, documentos, archivos listados y mediciones. No uses imagenes en este intento.`, [])),
+      });
+
+      if (!retryResponse.ok) {
+        const errorText = await retryResponse.text();
+        return { ok: false, error: `OpenAI no pudo reintentar el presupuesto: ${errorText.slice(0, 240)}` };
+      }
+
+      const retryCompletion = await retryResponse.json();
+      content = extractOpenAIMessageContent(retryCompletion);
+      console.log("[Decoralia AI budget] Retry completion:", JSON.stringify(summarizeOpenAICompletion(retryCompletion)).slice(0, 5000));
+    }
+  }
+
+  if (!content) {
+    return { ok: false, error: "OpenAI devolvio una respuesta vacia. Revisa los logs del deploy para ver el motivo exacto." };
+  }
+
   console.log("[Decoralia AI budget] Raw OpenAI response:", content);
   const json = parseAIJson(content);
   console.log("[Decoralia AI budget] Parsed JSON:", JSON.stringify(json).slice(0, 5000));
@@ -764,6 +770,81 @@ function parseAIJson(content: unknown) {
       return { items: buildFallbackBudgetItemsFromText(content) };
     }
   }
+}
+
+function buildOpenAIBudgetRequest(prompt: string, imageUrls: string[]) {
+  return {
+    model: process.env.OPENAI_MODEL ?? "gpt-4o",
+    temperature: 0.2,
+    max_tokens: 2200,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content:
+          "Eres un presupuestador experto para Decoralia Pintores. Analizas toda la informacion disponible de una obra, sacas una conclusion profesional de lo que hay que hacer y la conviertes en partidas editables de presupuesto. Responde solo JSON valido.",
+      },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          ...imageUrls.map((url) => ({
+            type: "image_url",
+            image_url: { url },
+          })),
+        ],
+      },
+    ],
+  };
+}
+
+function extractOpenAIMessageContent(completion: unknown) {
+  if (!isRecord(completion)) return null;
+  const choices = completion.choices;
+  if (!Array.isArray(choices)) return null;
+  const firstChoice = choices[0];
+  if (!isRecord(firstChoice) || !isRecord(firstChoice.message)) return null;
+  const message = firstChoice.message;
+  const content = message.content;
+
+  if (typeof content === "string" && content.trim()) return content;
+  if (Array.isArray(content)) {
+    const text = content
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (!isRecord(part)) return "";
+        if (typeof part.text === "string") return part.text;
+        if (isRecord(part.text) && typeof part.text.value === "string") return part.text.value;
+        return "";
+      })
+      .join("\n")
+      .trim();
+    if (text) return text;
+  }
+
+  return null;
+}
+
+function summarizeOpenAICompletion(completion: unknown) {
+  if (!isRecord(completion)) return completion;
+  const choices = Array.isArray(completion.choices) ? completion.choices : [];
+  return {
+    id: completion.id,
+    model: completion.model,
+    choices: choices.map((choice) => {
+      if (!isRecord(choice)) return choice;
+      const message = isRecord(choice.message) ? choice.message : {};
+      return {
+        finish_reason: choice.finish_reason,
+        message: {
+          role: message.role,
+          content: message.content,
+          refusal: message.refusal,
+        },
+      };
+    }),
+    usage: completion.usage,
+  };
 }
 
 function normalizeAIBudgetJson(value: unknown) {
