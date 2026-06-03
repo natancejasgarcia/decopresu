@@ -1,9 +1,12 @@
-import { CheckCircle2, NotebookPen, RotateCcw, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { CalendarDays, CheckCircle2, NotebookPen, RotateCcw, Trash2 } from "lucide-react";
 import { createDailyNoteAction, deleteDailyNoteAction, toggleDailyNoteAction } from "@/actions/dailyNoteActions";
 import type { DailyNote } from "@/lib/types";
 
 type DailyNotesPanelProps = {
   notes: DailyNote[];
+  selectedDate: string;
+  availableDates: string[];
 };
 
 const timeFormatter = new Intl.DateTimeFormat("es-ES", {
@@ -11,9 +14,17 @@ const timeFormatter = new Intl.DateTimeFormat("es-ES", {
   minute: "2-digit",
 });
 
-export function DailyNotesPanel({ notes }: DailyNotesPanelProps) {
+const dateFormatter = new Intl.DateTimeFormat("es-ES", {
+  day: "2-digit",
+  month: "long",
+  year: "numeric",
+});
+
+export function DailyNotesPanel({ notes, selectedDate, availableDates }: DailyNotesPanelProps) {
   const pendingNotes = notes.filter((note) => !note.is_done);
   const doneNotes = notes.filter((note) => note.is_done);
+  const previousDate = shiftDate(selectedDate, -1);
+  const nextDate = shiftDate(selectedDate, 1);
 
   return (
     <section className="mt-5 rounded-lg border border-line bg-white p-4 shadow-soft">
@@ -23,46 +34,68 @@ export function DailyNotesPanel({ notes }: DailyNotesPanelProps) {
             <NotebookPen size={20} />
           </div>
           <div>
-            <p className="text-xs font-black uppercase text-clay">Notas de hoy</p>
-            <h2 className="text-xl font-black text-ink">Tareas y avisos del dia</h2>
-            <p className="text-sm font-semibold text-muted">Notas compartidas para Jose Antonio y Padre.</p>
+            <p className="text-xs font-black uppercase text-clay">Diario de trabajo</p>
+            <h2 className="text-xl font-black text-ink">Apuntes del dia</h2>
+            <p className="text-sm font-semibold text-muted">Guarda lo que se ha hecho, avisos, incidencias y recordatorios por fecha.</p>
           </div>
         </div>
         <span className="inline-flex h-9 items-center rounded-full bg-paper px-3 text-sm font-black text-ink">
-          {pendingNotes.length} pendientes
+          {notes.length} apuntes
         </span>
       </div>
 
-      <form action={createDailyNoteAction} className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
-        <input
-          className="form-input h-12 py-0"
+      <div className="mt-4 rounded-lg border border-line bg-paper p-3">
+        <form className="grid gap-2 sm:grid-cols-[auto_1fr_auto_auto]" method="get">
+          <Link className="inline-flex h-11 items-center justify-center rounded-lg border border-line bg-white px-3 text-sm font-black text-ink" href={`/notes?date=${previousDate}`}>
+            Dia anterior
+          </Link>
+          <label className="flex min-h-11 items-center gap-2 rounded-lg border border-line bg-white px-3">
+            <CalendarDays size={18} className="text-moss" />
+            <input className="w-full bg-transparent text-sm font-black text-ink outline-none" type="date" name="date" defaultValue={selectedDate} />
+          </label>
+          <button className="h-11 rounded-lg bg-ink px-4 text-sm font-black text-white" type="submit">
+            Ver fecha
+          </button>
+          <Link className="inline-flex h-11 items-center justify-center rounded-lg border border-line bg-white px-3 text-sm font-black text-ink" href={`/notes?date=${nextDate}`}>
+            Dia siguiente
+          </Link>
+        </form>
+        <p className="mt-2 text-sm font-semibold text-muted">
+          Viendo {formatDateLabel(selectedDate)}
+        </p>
+      </div>
+
+      <form action={createDailyNoteAction} className="mt-4 grid gap-2">
+        <input type="hidden" name="note_date" value={selectedDate} />
+        <textarea
+          className="form-input min-h-28"
           name="text"
-          placeholder="Ej: llamar a Clara, comprar pintura, revisar presupuesto..."
-          maxLength={500}
+          placeholder="Ej: Hoy se ha preparado el salon, tapado suelo, reparado grietas y queda pendiente dar segunda mano..."
+          maxLength={2000}
           required
         />
         <button className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-moss px-5 font-black text-white" type="submit">
           <NotebookPen size={18} />
-          Anadir nota
+          Guardar apunte
         </button>
       </form>
 
       <div className="mt-4 grid gap-2">
         {notes.length === 0 ? (
           <div className="rounded-lg bg-paper p-4 text-sm font-semibold text-muted">
-            No hay notas para hoy.
+            No hay apuntes guardados para esta fecha.
           </div>
         ) : (
           <>
             {pendingNotes.map((note) => (
-              <DailyNoteRow key={note.id} note={note} />
+              <DailyNoteRow key={note.id} note={note} selectedDate={selectedDate} />
             ))}
             {doneNotes.length > 0 ? (
               <div className="mt-2 border-t border-line pt-3">
-                <p className="mb-2 text-xs font-black uppercase text-muted">Listas</p>
+                <p className="mb-2 text-xs font-black uppercase text-muted">Archivados</p>
                 <div className="grid gap-2">
                   {doneNotes.map((note) => (
-                    <DailyNoteRow key={note.id} note={note} />
+                    <DailyNoteRow key={note.id} note={note} selectedDate={selectedDate} />
                   ))}
                 </div>
               </div>
@@ -70,11 +103,28 @@ export function DailyNotesPanel({ notes }: DailyNotesPanelProps) {
           </>
         )}
       </div>
+
+      {availableDates.length > 0 ? (
+        <div className="mt-5 border-t border-line pt-4">
+          <p className="mb-2 text-xs font-black uppercase text-muted">Dias con apuntes</p>
+          <div className="flex flex-wrap gap-2">
+            {availableDates.slice(0, 16).map((date) => (
+              <Link
+                key={date}
+                href={`/notes?date=${date}`}
+                className={`rounded-full px-3 py-2 text-xs font-black ${date === selectedDate ? "bg-moss text-white" : "bg-paper text-ink"}`}
+              >
+                {formatShortDate(date)}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
 
-function DailyNoteRow({ note }: { note: DailyNote }) {
+function DailyNoteRow({ note, selectedDate }: { note: DailyNote; selectedDate: string }) {
   const createdAt = new Date(note.created_at);
 
   return (
@@ -91,17 +141,19 @@ function DailyNoteRow({ note }: { note: DailyNote }) {
         <div className="flex shrink-0 gap-2">
           <form action={toggleDailyNoteAction}>
             <input type="hidden" name="note_id" value={note.id} />
+            <input type="hidden" name="note_date" value={selectedDate} />
             <input type="hidden" name="is_done" value={note.is_done ? "false" : "true"} />
             <button
               className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-black text-ink"
               type="submit"
             >
               {note.is_done ? <RotateCcw size={16} /> : <CheckCircle2 size={16} />}
-              {note.is_done ? "Reabrir" : "Listo"}
+              {note.is_done ? "Reabrir" : "Archivar"}
             </button>
           </form>
           <form action={deleteDailyNoteAction}>
             <input type="hidden" name="note_id" value={note.id} />
+            <input type="hidden" name="note_date" value={selectedDate} />
             <button
               className="grid h-10 w-10 place-items-center rounded-lg border border-red-100 bg-red-50 text-red-700"
               type="submit"
@@ -115,4 +167,18 @@ function DailyNoteRow({ note }: { note: DailyNote }) {
       </div>
     </article>
   );
+}
+
+function shiftDate(date: string, days: number) {
+  const nextDate = new Date(`${date}T12:00:00`);
+  nextDate.setDate(nextDate.getDate() + days);
+  return nextDate.toISOString().slice(0, 10);
+}
+
+function formatDateLabel(date: string) {
+  return dateFormatter.format(new Date(`${date}T12:00:00`));
+}
+
+function formatShortDate(date: string) {
+  return new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short" }).format(new Date(`${date}T12:00:00`));
 }
