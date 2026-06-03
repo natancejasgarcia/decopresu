@@ -176,17 +176,6 @@ export default async function PrintBudgetPage({ params }: PrintBudgetPageProps) 
           </table>
         </section>
 
-        <section className="mt-7 border-t border-[#d8ddd8] pt-4 text-[11px] leading-relaxed text-[#152630]">
-          <h2 className="mb-3 text-[13px] font-black uppercase tracking-[0.04em]">Comentarios</h2>
-          <ul className="space-y-1 pl-4">
-            {BUDGET_COMMENTS.map((comment) => (
-              <li key={comment}>{comment}</li>
-            ))}
-          </ul>
-          <h2 className="mb-2 mt-5 text-[13px] font-black uppercase tracking-[0.04em]">Términos y condiciones</h2>
-          <p className="text-[10px] leading-5 text-[#58636c]">{BUDGET_TERMS}</p>
-        </section>
-
         <section className="mt-7 ml-auto w-full max-w-[330px] text-[14px]">
           <div className="grid grid-cols-[1fr_auto] gap-y-3 border-b border-[#d8ddd8] pb-3">
             <span className="font-black text-[#58636c]">Base imponible:</span>
@@ -198,6 +187,17 @@ export default async function PrintBudgetPage({ params }: PrintBudgetPageProps) 
             <span className="text-[16px] font-black">TOTAL:</span>
             <span className="text-[18px] font-black">{formatCurrency(total)}</span>
           </div>
+        </section>
+
+        <section className="mt-7 border-t border-[#d8ddd8] pt-4 text-[11px] leading-relaxed text-[#152630]">
+          <h2 className="mb-3 text-[13px] font-black uppercase tracking-[0.04em]">Comentarios</h2>
+          <ul className="space-y-1 pl-4">
+            {BUDGET_COMMENTS.map((comment) => (
+              <li key={comment}>{comment}</li>
+            ))}
+          </ul>
+          <h2 className="mb-3 mt-8 border-t border-[#d8ddd8] pt-4 text-[13px] font-black uppercase tracking-[0.04em]">Términos y condiciones</h2>
+          <p className="text-[10.5px] leading-6 text-[#58636c]">{BUDGET_TERMS}</p>
         </section>
 
         <footer className="mt-12 border-t border-[#d8ddd8] pt-5 text-center text-[13px] font-bold text-[#58636c]">

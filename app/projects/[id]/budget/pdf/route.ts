@@ -263,6 +263,19 @@ export async function GET(_request: NextRequest, { params }: Context) {
     }
   }
 
+  y -= 18;
+  ({ page, y } = ensurePage(pdf, page, y, 110));
+  const totalsX = PAGE_WIDTH - MARGIN - 210;
+  page.drawRectangle({ x: totalsX, y: y - 66, width: 210, height: 66, color: LIGHT });
+  page.drawText("Base imponible:", { x: totalsX + 12, y: y - 18, size: 8.5, font: fonts.bold, color: MUTED });
+  page.drawText(money(taxableBase), { x: totalsX + 198 - fonts.bold.widthOfTextAtSize(money(taxableBase), 8.5), y: y - 18, size: 8.5, font: fonts.bold, color: INK });
+  page.drawText("IVA (21%):", { x: totalsX + 12, y: y - 36, size: 8.5, font: fonts.bold, color: MUTED });
+  page.drawText(money(vat), { x: totalsX + 198 - fonts.bold.widthOfTextAtSize(money(vat), 8.5), y: y - 36, size: 8.5, font: fonts.bold, color: INK });
+  page.drawRectangle({ x: totalsX, y: y - 98, width: 210, height: 26, color: INK });
+  page.drawText("TOTAL:", { x: totalsX + 12, y: y - 88, size: 10, font: fonts.bold, color: rgb(1, 1, 1) });
+  page.drawText(money(total), { x: totalsX + 198 - fonts.bold.widthOfTextAtSize(money(total), 10.5), y: y - 88, size: 10.5, font: fonts.bold, color: rgb(1, 1, 1) });
+  y -= 118;
+
   y -= 16;
   ({ page, y } = ensurePage(pdf, page, y, 150));
   y = sectionTitle(page, "Comentarios", y, fonts);
@@ -276,14 +289,14 @@ export async function GET(_request: NextRequest, { params }: Context) {
     y -= 2;
   }
 
-  y -= 6;
-  ({ page, y } = ensurePage(pdf, page, y, 90));
+  y -= 18;
+  ({ page, y } = ensurePage(pdf, page, y, 120));
   y = sectionTitle(page, "Terminos y condiciones", y, fonts);
-  const termsLines = wrapText(BUDGET_TERMS, fonts.regular, 6.8, PAGE_WIDTH - MARGIN * 2);
+  const termsLines = wrapText(BUDGET_TERMS, fonts.regular, 7, PAGE_WIDTH - MARGIN * 2);
   for (const line of termsLines) {
-    ({ page, y } = ensurePage(pdf, page, y, 10));
-    page.drawText(line, { x: MARGIN, y: y - 9, size: 6.8, font: fonts.regular, color: MUTED });
-    y -= 8;
+    ({ page, y } = ensurePage(pdf, page, y, 12));
+    page.drawText(line, { x: MARGIN, y: y - 10, size: 7, font: fonts.regular, color: MUTED });
+    y -= 10;
   }
 
   if (rooms.length > 0) {
@@ -358,18 +371,6 @@ export async function GET(_request: NextRequest, { params }: Context) {
       y -= rowHeight;
     }
   }
-
-  y -= 18;
-  ({ page, y } = ensurePage(pdf, page, y, 95));
-  const totalsX = PAGE_WIDTH - MARGIN - 210;
-  page.drawRectangle({ x: totalsX, y: y - 66, width: 210, height: 66, color: LIGHT });
-  page.drawText("Base imponible:", { x: totalsX + 12, y: y - 18, size: 8.5, font: fonts.bold, color: MUTED });
-  page.drawText(money(taxableBase), { x: totalsX + 198 - fonts.bold.widthOfTextAtSize(money(taxableBase), 8.5), y: y - 18, size: 8.5, font: fonts.bold, color: INK });
-  page.drawText("IVA (21%):", { x: totalsX + 12, y: y - 36, size: 8.5, font: fonts.bold, color: MUTED });
-  page.drawText(money(vat), { x: totalsX + 198 - fonts.bold.widthOfTextAtSize(money(vat), 8.5), y: y - 36, size: 8.5, font: fonts.bold, color: INK });
-  page.drawRectangle({ x: totalsX, y: y - 98, width: 210, height: 26, color: INK });
-  page.drawText("TOTAL:", { x: totalsX + 12, y: y - 88, size: 10, font: fonts.bold, color: rgb(1, 1, 1) });
-  page.drawText(money(total), { x: totalsX + 198 - fonts.bold.widthOfTextAtSize(money(total), 10.5), y: y - 88, size: 10.5, font: fonts.bold, color: rgb(1, 1, 1) });
 
   page.drawText("Gracias por confiar en Decoralia Pintores.", {
     x: MARGIN,
