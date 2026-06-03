@@ -179,10 +179,15 @@ export async function generateBudgetItemsWithAIAction(formData: FormData) {
 
   const completion = await response.json();
   const content = completion?.choices?.[0]?.message?.content;
+  console.log("[Decoralia AI budget] Raw OpenAI response:", content);
   const json = parseAIJson(content);
-  const parsed = generatedBudgetSchema.safeParse(normalizeAIBudgetJson(json));
+  console.log("[Decoralia AI budget] Parsed JSON:", JSON.stringify(json).slice(0, 5000));
+  const normalizedJson = normalizeAIBudgetJson(json);
+  console.log("[Decoralia AI budget] Normalized items:", JSON.stringify(normalizedJson).slice(0, 5000));
+  const parsed = generatedBudgetSchema.safeParse(normalizedJson);
 
   if (!parsed.success) {
+    console.log("[Decoralia AI budget] Validation error:", parsed.error.flatten());
     return { ok: false, error: "La IA no devolvio conceptos validos. Prueba con mas datos o fotos del proyecto." };
   }
 
