@@ -1,5 +1,6 @@
 "use server";
 
+import { inflateRawSync } from "node:zlib";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUserProfile } from "@/lib/auth";
@@ -7,6 +8,9 @@ import { formatCurrency } from "@/lib/calculations";
 import type { BudgetItem, Project, ProjectFile, Room, RoomModule } from "@/lib/types";
 
 type Supabase = Awaited<ReturnType<typeof requireUserProfile>>["supabase"];
+
+const MAX_AI_DOCUMENT_CHARS = 14000;
+const MAX_AI_FILE_CHARS = 3500;
 
 const budgetItemSchema = z.object({
   project_id: z.string().uuid(),
@@ -119,7 +123,8 @@ export async function generateBudgetItemsWithAIAction(formData: FormData) {
   }
 
   const imageUrls = await getProjectImageSignedUrls(supabase, files ?? []);
-  const prompt = buildAIBudgetPrompt(project, files ?? []);
+  const documentText = await getProjectDocumentText(supabase, files ?? []);
+  const prompt = buildAIBudgetPrompt(project, files ?? [], documentText);
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -431,7 +436,226 @@ async function getProjectImageSignedUrls(supabase: Supabase, files: ProjectFile[
   return signedUrls.filter((url): url is string => Boolean(url));
 }
 
-function buildAIBudgetPrompt(project: Project, files: ProjectFile[]) {
+async function getProjectDocumentText(supabase: Supabase, files: ProjectFile[]) {
+  const readableFiles = files.filter(isReadableTextFile).slice(0, 8);
+  const textParts: string[] = [];
+
+  for (const file of readableFiles) {
+    const { data, error } = await supabase.storage.from("project-files").download(file.file_url);
+    if (error || !data) continue;
+
+    const bytes = new Uint8Array(await data.arrayBuffer());
+    const text = cleanExtractedText(extractTextFromProjectFile(file, bytes));
+    if (!text) continue;
+
+    textParts.push(`Archivo: ${file.file_name}\n${truncateText(text, MAX_AI_FILE_CHARS)}`);
+  }
+
+  return truncateText(textParts.join("\n\n"), MAX_AI_DOCUMENT_CHARS);
+}
+
+function isReadableTextFile(file: ProjectFile) {
+  const fileName = file.file_name.toLowerCase();
+  const fileType = file.file_type.toLowerCase();
+
+  return (
+    fileType.startsWith("text/") ||
+    fileType === "application/pdf" ||
+    fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    fileName.endsWith(".txt") ||
+    fileName.endsWith(".md") ||
+    fileName.endsWith(".pdf") ||
+    fileName.endsWith(".docx")
+  );
+}
+
+function extractTextFromProjectFile(file: ProjectFile, bytes: Uint8Array) {
+  const fileName = file.file_name.toLowerCase();
+  const fileType = file.file_type.toLowerCase();
+
+  if (fileType.startsWith("text/") || fileName.endsWith(".txt") || fileName.endsWith(".md")) {
+    return decodeUtf8(bytes);
+  }
+
+  if (fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || fileName.endsWith(".docx")) {
+    return extractDocxText(bytes);
+  }
+
+  if (fileType === "application/pdf" || fileName.endsWith(".pdf")) {
+    return extractPdfText(bytes);
+  }
+
+  return "";
+}
+
+function extractDocxText(bytes: Uint8Array) {
+  const entries = readZipEntries(bytes);
+  const xmlFiles = entries.filter((entry) =>
+    entry.name === "word/document.xml" ||
+    entry.name.startsWith("word/header") ||
+    entry.name.startsWith("word/footer") ||
+    entry.name === "word/comments.xml",
+  );
+
+  return xmlFiles.map((entry) => extractTextFromDocxXml(decodeUtf8(entry.content))).join("\n");
+}
+
+function readZipEntries(bytes: Uint8Array) {
+  const entries: Array<{ name: string; content: Uint8Array }> = [];
+  const eocdOffset = findEndOfCentralDirectory(bytes);
+  if (eocdOffset < 0) return entries;
+
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const centralDirectorySize = view.getUint32(eocdOffset + 12, true);
+  const centralDirectoryOffset = view.getUint32(eocdOffset + 16, true);
+  let offset = centralDirectoryOffset;
+  const end = centralDirectoryOffset + centralDirectorySize;
+
+  while (offset < end && view.getUint32(offset, true) === 0x02014b50) {
+    const method = view.getUint16(offset + 10, true);
+    const compressedSize = view.getUint32(offset + 20, true);
+    const fileNameLength = view.getUint16(offset + 28, true);
+    const extraLength = view.getUint16(offset + 30, true);
+    const commentLength = view.getUint16(offset + 32, true);
+    const localHeaderOffset = view.getUint32(offset + 42, true);
+    const fileNameBytes = bytes.slice(offset + 46, offset + 46 + fileNameLength);
+    const name = decodeUtf8(fileNameBytes);
+    const localNameLength = view.getUint16(localHeaderOffset + 26, true);
+    const localExtraLength = view.getUint16(localHeaderOffset + 28, true);
+    const dataStart = localHeaderOffset + 30 + localNameLength + localExtraLength;
+    const compressed = bytes.slice(dataStart, dataStart + compressedSize);
+
+    if (method === 0) {
+      entries.push({ name, content: compressed });
+    } else if (method === 8) {
+      try {
+        entries.push({ name, content: new Uint8Array(inflateRawSync(compressed)) });
+      } catch {
+        // Ignore entries that cannot be decompressed.
+      }
+    }
+
+    offset += 46 + fileNameLength + extraLength + commentLength;
+  }
+
+  return entries;
+}
+
+function findEndOfCentralDirectory(bytes: Uint8Array) {
+  for (let index = bytes.length - 22; index >= 0; index -= 1) {
+    if (bytes[index] === 0x50 && bytes[index + 1] === 0x4b && bytes[index + 2] === 0x05 && bytes[index + 3] === 0x06) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function extractTextFromDocxXml(xml: string) {
+  const paragraphs = xml.match(/<w:p[\s\S]*?<\/w:p>/g) ?? [xml];
+  const lines = paragraphs
+    .map((paragraph) => {
+      const runs = [...paragraph.matchAll(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g)].map((match) => decodeXml(match[1]));
+      return runs.join("");
+    })
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return lines.join("\n");
+}
+
+function extractPdfText(bytes: Uint8Array) {
+  const latinText = decodeLatin1(bytes);
+  const streamText = [...latinText.matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g)]
+    .map((match) => {
+      const rawBytes = latin1StringToBytes(match[1]);
+      const streamStart = Math.max(0, (match.index ?? 0) - 260);
+      const dictionary = latinText.slice(streamStart, match.index ?? 0);
+
+      if (dictionary.includes("/FlateDecode")) {
+        try {
+          return decodeLatin1(new Uint8Array(inflateRawSync(rawBytes)));
+        } catch {
+          return "";
+        }
+      }
+
+      return decodeLatin1(rawBytes);
+    })
+    .join("\n");
+
+  return [extractPdfTextOperators(streamText), extractPdfTextOperators(latinText)].filter(Boolean).join("\n");
+}
+
+function extractPdfTextOperators(content: string) {
+  const fragments: string[] = [];
+
+  for (const match of content.matchAll(/\((?:\\.|[^\\()])*\)\s*Tj/g)) {
+    fragments.push(decodePdfLiteral(match[0].replace(/\s*Tj$/, "")));
+  }
+
+  for (const match of content.matchAll(/\[([\s\S]*?)\]\s*TJ/g)) {
+    const arrayContent = match[1];
+    const parts = [...arrayContent.matchAll(/\((?:\\.|[^\\()])*\)/g)].map((part) => decodePdfLiteral(part[0]));
+    if (parts.length) fragments.push(parts.join(""));
+  }
+
+  return fragments.join(" ");
+}
+
+function decodePdfLiteral(value: string) {
+  const body = value.startsWith("(") && value.endsWith(")") ? value.slice(1, -1) : value;
+  return body
+    .replace(/\\([nrtbf()\\])/g, (_match, code: string) => {
+      if (code === "n") return "\n";
+      if (code === "r") return "\r";
+      if (code === "t") return "\t";
+      if (code === "b") return "\b";
+      if (code === "f") return "\f";
+      return code;
+    })
+    .replace(/\\([0-7]{1,3})/g, (_match, octal: string) => String.fromCharCode(parseInt(octal, 8)))
+    .replace(/\\\r?\n/g, "");
+}
+
+function decodeUtf8(bytes: Uint8Array) {
+  return new TextDecoder("utf-8").decode(bytes);
+}
+
+function decodeLatin1(bytes: Uint8Array) {
+  return new TextDecoder("latin1").decode(bytes);
+}
+
+function latin1StringToBytes(value: string) {
+  const bytes = new Uint8Array(value.length);
+  for (let index = 0; index < value.length; index += 1) {
+    bytes[index] = value.charCodeAt(index) & 0xff;
+  }
+  return bytes;
+}
+
+function decodeXml(value: string) {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+}
+
+function cleanExtractedText(value: string) {
+  return value
+    .replace(/\u0000/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function truncateText(value: string, maxLength: number) {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength)}\n[Texto recortado por longitud]`;
+}
+
+function buildAIBudgetPrompt(project: Project, files: ProjectFile[], documentText: string) {
   const fileSummary = files.length
     ? files.map((file) => `- ${file.file_name} (${file.file_type})`).join("\n")
     : "No hay archivos subidos.";
@@ -449,6 +673,9 @@ Datos de la obra:
 
 Archivos disponibles:
 ${fileSummary}
+
+Texto extraido de documentos, PDFs o notas:
+${documentText || "No se pudo extraer texto adicional."}
 
 Reglas:
 - Devuelve solo JSON con esta forma exacta: {"items":[{"concept":"...","notes":"...","quantity":1,"unit":"","unit_price":260}]}
