@@ -27,9 +27,9 @@ const generatedBudgetSchema = z.object({
       z.object({
         concept: z.string().trim().min(1).max(140),
         notes: z.string().trim().max(1800).optional().nullable(),
-        quantity: z.coerce.number().positive().default(1),
+        quantity: z.preprocess((value) => parseFlexibleNumber(value, 1), z.number().positive()),
         unit: z.string().trim().max(20).optional().nullable(),
-        unit_price: z.coerce.number().min(0),
+        unit_price: z.preprocess((value) => parseFlexibleNumber(value, 0), z.number().min(0)),
       }),
     )
     .min(1)
@@ -164,7 +164,7 @@ export async function generateBudgetItemsWithAIAction(formData: FormData) {
   const completion = await response.json();
   const content = completion?.choices?.[0]?.message?.content;
   const json = parseAIJson(content);
-  const parsed = generatedBudgetSchema.safeParse(json);
+  const parsed = generatedBudgetSchema.safeParse(normalizeAIBudgetJson(json));
 
   if (!parsed.success) {
     return { ok: false, error: "La IA no devolvio conceptos validos. Prueba con mas datos o fotos del proyecto." };
@@ -694,14 +694,150 @@ function parseAIJson(content: unknown) {
   try {
     return JSON.parse(content);
   } catch {
-    const match = content.match(/\{[\s\S]*\}/);
-    if (!match) return null;
+    const match = content.match(/\{[\s\S]*\}/) ?? content.match(/\[[\s\S]*\]/);
+    if (!match) return { items: buildFallbackBudgetItemsFromText(content) };
     try {
       return JSON.parse(match[0]);
     } catch {
-      return null;
+      return { items: buildFallbackBudgetItemsFromText(content) };
     }
   }
+}
+
+function normalizeAIBudgetJson(value: unknown) {
+  const rawItems = getAIBudgetItems(value);
+  return {
+    items: rawItems.map(normalizeAIBudgetItem).filter((item) => item.concept && item.unit_price >= 0).slice(0, 8),
+  };
+}
+
+function getAIBudgetItems(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (!isRecord(value)) return [];
+
+  const directKeys = ["items", "concepts", "conceptos", "lineas", "líneas", "budget_items", "partidas", "presupuesto"];
+  for (const key of directKeys) {
+    const maybeItems = value[key];
+    if (Array.isArray(maybeItems)) return maybeItems;
+  }
+
+  const firstArray = Object.values(value).find((entry) => Array.isArray(entry));
+  if (Array.isArray(firstArray)) return firstArray;
+
+  if (getFirstString(value, ["concept", "concepto", "title", "titulo", "nombre", "partida"])) {
+    return [value];
+  }
+
+  return [];
+}
+
+function normalizeAIBudgetItem(value: unknown) {
+  if (!isRecord(value)) {
+    return {
+      concept: String(value ?? "").trim().slice(0, 140),
+      notes: null,
+      quantity: 1,
+      unit: "",
+      unit_price: 0,
+    };
+  }
+
+  const concept =
+    getFirstString(value, ["concept", "concepto", "title", "titulo", "nombre", "partida", "descripcion_corta"]) ||
+    "Concepto generado con IA";
+  const notes = getFirstString(value, ["notes", "notas", "detail", "details", "detalle", "descripcion", "description", "trabajos"]);
+  const quantity = parseFlexibleNumber(getFirstValue(value, ["quantity", "cantidad", "qty", "unidades", "metros"]), 1);
+  const unit = getFirstString(value, ["unit", "unidad", "tipo_unidad"]) ?? "";
+  const rawUnitPrice = getFirstValue(value, ["unit_price", "precio_unitario", "precio", "precio_m2", "€/m2", "eur_m2"]);
+  const rawTotal = getFirstValue(value, ["total", "importe", "amount", "precio_total", "subtotal"]);
+  const unitPrice = parseFlexibleNumber(rawUnitPrice, Number.NaN);
+  const total = parseFlexibleNumber(rawTotal, Number.NaN);
+  const resolvedUnitPrice = Number.isFinite(unitPrice)
+    ? unitPrice
+    : Number.isFinite(total)
+      ? total / Math.max(quantity, 1)
+      : 0;
+
+  return {
+    concept: concept.slice(0, 140),
+    notes: notes ? notes.slice(0, 1800) : null,
+    quantity,
+    unit: unit.slice(0, 20),
+    unit_price: Math.max(0, resolvedUnitPrice),
+  };
+}
+
+function buildFallbackBudgetItemsFromText(content: string) {
+  const lines = content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return lines
+    .map((line) => {
+      const priceMatch = line.match(/(\d+(?:[.,]\d{1,2})?)\s*€/);
+      if (!priceMatch) return null;
+      return {
+        concept: line.replace(priceMatch[0], "").replace(/^[-*\d.)\s]+/, "").trim().slice(0, 140) || "Concepto generado con IA",
+        notes: line,
+        quantity: 1,
+        unit: "",
+        unit_price: parseFlexibleNumber(priceMatch[1], 0),
+      };
+    })
+    .filter(Boolean);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getFirstValue(value: Record<string, unknown>, keys: string[]) {
+  const normalizedEntries = new Map(Object.entries(value).map(([key, entry]) => [normalizeKey(key), entry]));
+  for (const key of keys) {
+    const entry = normalizedEntries.get(normalizeKey(key));
+    if (entry !== undefined && entry !== null && entry !== "") return entry;
+  }
+  return undefined;
+}
+
+function getFirstString(value: Record<string, unknown>, keys: string[]) {
+  const entry = getFirstValue(value, keys);
+  if (Array.isArray(entry)) return entry.map((item) => String(item)).join("\n").trim();
+  if (entry === undefined || entry === null) return null;
+  return String(entry).trim() || null;
+}
+
+function normalizeKey(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function parseFlexibleNumber(value: unknown, fallback: number) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : fallback;
+  if (value === undefined || value === null || value === "") return fallback;
+
+  let normalized = String(value).trim().replace(/[^\d,.-]/g, "");
+  if (!normalized) return fallback;
+
+  const lastComma = normalized.lastIndexOf(",");
+  const lastDot = normalized.lastIndexOf(".");
+  if (lastComma >= 0 && lastDot >= 0) {
+    normalized = lastComma > lastDot ? normalized.replace(/\./g, "").replace(",", ".") : normalized.replace(/,/g, "");
+  } else if (lastComma >= 0) {
+    normalized = normalized.replace(",", ".");
+  }
+
+  const parts = normalized.split(".");
+  if (parts.length > 2) {
+    normalized = `${parts.slice(0, -1).join("")}.${parts.at(-1)}`;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 async function insertGeneratedBudgetItems(supabase: Supabase, projectId: string, generatedItems: GeneratedBudgetItem[]) {
