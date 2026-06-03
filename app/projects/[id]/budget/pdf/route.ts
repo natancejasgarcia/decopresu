@@ -18,6 +18,19 @@ const LINE = rgb(0.82, 0.85, 0.83);
 const MOSS = rgb(0.13, 0.37, 0.32);
 const LIGHT = rgb(0.95, 0.96, 0.94);
 
+const BUDGET_COMMENTS = [
+  "Presupuesto valido 30 dias.",
+  "Incluido mano de obra, materiales y herramientas necesarias para realizar los trabajos.",
+  "Nuestros operarios cumplen todos los requisitos exigidos por la normativa aplicable al trabajador (cursos seguridad, alta seguridad social, etc.).",
+  "Para la aceptacion de los trabajos rogamos nos devuelvan este presupuesto firmado.",
+  "Las unidades de obra no mencionadas en este presupuesto se facturaran aparte.",
+  "Se aceptan pagos con tarjeta bancaria.",
+  "Forma de pago: 35 % al empezar, 35 % a la mitad, resto al concluir.",
+];
+
+const BUDGET_TERMS =
+  "Le informamos que cualquier dato de caracter personal que nos haya facilitado sera tratado por tiempo indefinido, mientras que no comunique lo contrario, por DECORALIA PINTORES, con la finalidad de prestar los servicios solicitados, atender sus consultas y enviarle informacion que pueda ser de su interes. Podra ejercitar sus derechos de acceso, rectificacion, supresion, oposicion, limitacion del tratamiento, portabilidad de datos y a no ser objeto de decisiones individualizadas automatizadas (incluida la elaboracion de perfiles), enviando solicitud firmada por correo postal con asunto Proteccion de Datos a la direccion: Apart correos 192 (11.130 Chiclana de la Frontera) o info@decoraliapintores.es";
+
 type Context = {
   params: {
     id: string;
@@ -251,21 +264,26 @@ export async function GET(_request: NextRequest, { params }: Context) {
   }
 
   y -= 16;
-  ({ page, y } = ensurePage(pdf, page, y, 95));
-  y = sectionTitle(page, "Condiciones del presupuesto", y, fonts);
-  const budgetConditions = [
-    "1. Para iniciar los trabajos se abonara el 35% del importe presupuestado en concepto de reserva de fecha, organizacion del trabajo y acopio inicial de materiales.",
-    "2. Este presupuesto incluye exclusivamente los conceptos detallados anteriormente. Cualquier trabajo, reparacion, material o actuacion no descrita en este documento no esta incluido y se presupuestara aparte antes de realizarse.",
-    "3. La aceptacion del presupuesto implica la conformidad con estas condiciones.",
-  ];
-  for (const condition of budgetConditions) {
-    const lines = wrapText(condition, fonts.regular, 7.8, PAGE_WIDTH - MARGIN * 2);
-    ({ page, y } = ensurePage(pdf, page, y, 12 * lines.length + 8));
+  ({ page, y } = ensurePage(pdf, page, y, 150));
+  y = sectionTitle(page, "Comentarios", y, fonts);
+  for (const comment of BUDGET_COMMENTS) {
+    const lines = wrapText(`- ${comment}`, fonts.regular, 7.4, PAGE_WIDTH - MARGIN * 2);
+    ({ page, y } = ensurePage(pdf, page, y, 9 * lines.length + 6));
     for (const line of lines) {
-      page.drawText(line, { x: MARGIN, y: y - 12, size: 7.8, font: fonts.regular, color: INK });
-      y -= 10;
+      page.drawText(line, { x: MARGIN, y: y - 10, size: 7.4, font: fonts.regular, color: INK });
+      y -= 9;
     }
-    y -= 3;
+    y -= 2;
+  }
+
+  y -= 6;
+  ({ page, y } = ensurePage(pdf, page, y, 90));
+  y = sectionTitle(page, "Terminos y condiciones", y, fonts);
+  const termsLines = wrapText(BUDGET_TERMS, fonts.regular, 6.8, PAGE_WIDTH - MARGIN * 2);
+  for (const line of termsLines) {
+    ({ page, y } = ensurePage(pdf, page, y, 10));
+    page.drawText(line, { x: MARGIN, y: y - 9, size: 6.8, font: fonts.regular, color: MUTED });
+    y -= 8;
   }
 
   if (rooms.length > 0) {

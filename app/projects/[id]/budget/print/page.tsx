@@ -17,6 +17,19 @@ type PrintBudgetPageProps = {
 
 const VAT_RATE = 0.21;
 
+const BUDGET_COMMENTS = [
+  "Presupuesto válido 30 días.",
+  "Incluido mano de obra, materiales y herramientas necesarias para realizar los trabajos.",
+  "Nuestros operarios cumplen todos los requisitos exigidos por la normativa aplicable al trabajador (cursos seguridad, alta seguridad social, etc.).",
+  "Para la aceptación de los trabajos rogamos nos devuelvan este presupuesto firmado.",
+  "Las unidades de obra no mencionadas en este presupuesto se facturarán aparte.",
+  "Se aceptan pagos con tarjeta bancaria.",
+  "Forma de pago: 35 % al empezar, 35 % a la mitad, resto al concluir.",
+];
+
+const BUDGET_TERMS =
+  "Le informamos que cualquier dato de carácter personal que nos haya facilitado será tratado por tiempo indefinido, mientras que no comunique lo contrario, por DECORALIA PINTORES, con la finalidad de prestar los servicios solicitados, atender sus consultas y enviarle información que pueda ser de su interés. Podrá ejercitar sus derechos de acceso, rectificación, supresión, oposición, limitación del tratamiento, portabilidad de datos y a no ser objeto de decisiones individualizadas automatizadas (incluida la elaboración de perfiles), enviando solicitud firmada por correo postal con asunto “Protección de Datos”, a la dirección: Apart correos 192 (11.130 Chiclana de la Frontera) o info@decoraliapintores.es";
+
 function formatShortDate(date: Date) {
   return new Intl.DateTimeFormat("es-ES", {
     day: "2-digit",
@@ -163,20 +176,15 @@ export default async function PrintBudgetPage({ params }: PrintBudgetPageProps) 
           </table>
         </section>
 
-        <section className="mt-7 border-t border-[#d8ddd8] pt-4 text-[12px] leading-relaxed text-[#152630]">
-          <h2 className="mb-3 text-[13px] font-black uppercase tracking-[0.04em]">Condiciones del presupuesto</h2>
-          <ol className="space-y-2 pl-4">
-            <li>
-              Para iniciar los trabajos se abonara el 35% del importe presupuestado en concepto de reserva de fecha,
-              organizacion del trabajo y acopio inicial de materiales.
-            </li>
-            <li>
-              Este presupuesto incluye exclusivamente los conceptos detallados anteriormente. Cualquier trabajo,
-              reparacion, material o actuacion no descrita en este documento no esta incluido y se presupuestara aparte
-              antes de realizarse.
-            </li>
-            <li>La aceptacion del presupuesto implica la conformidad con estas condiciones.</li>
-          </ol>
+        <section className="mt-7 border-t border-[#d8ddd8] pt-4 text-[11px] leading-relaxed text-[#152630]">
+          <h2 className="mb-3 text-[13px] font-black uppercase tracking-[0.04em]">Comentarios</h2>
+          <ul className="space-y-1 pl-4">
+            {BUDGET_COMMENTS.map((comment) => (
+              <li key={comment}>{comment}</li>
+            ))}
+          </ul>
+          <h2 className="mb-2 mt-5 text-[13px] font-black uppercase tracking-[0.04em]">Términos y condiciones</h2>
+          <p className="text-[10px] leading-5 text-[#58636c]">{BUDGET_TERMS}</p>
         </section>
 
         <section className="mt-7 ml-auto w-full max-w-[330px] text-[14px]">
