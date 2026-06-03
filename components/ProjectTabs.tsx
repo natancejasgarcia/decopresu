@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FileText, ImagePlus, MessageCircle, ReceiptText, Ruler, UserRound, WalletCards } from "lucide-react";
 import { BudgetBuilder } from "@/components/BudgetBuilder";
 import { ClientCard } from "@/components/ClientCard";
 import { FileUploader } from "@/components/FileUploader";
@@ -25,6 +26,16 @@ type ProjectTabsProps = {
 const TABS = ["Resumen", "Chat", "Archivos", "Cliente", "Medidas", "Presupuesto", "Gastos"] as const;
 type Tab = (typeof TABS)[number];
 
+const TAB_ICONS = {
+  Resumen: FileText,
+  Chat: MessageCircle,
+  Archivos: ImagePlus,
+  Cliente: UserRound,
+  Medidas: Ruler,
+  Presupuesto: ReceiptText,
+  Gastos: WalletCards,
+} satisfies Record<Tab, typeof FileText>;
+
 export function ProjectTabs({
   project,
   profile,
@@ -41,18 +52,25 @@ export function ProjectTabs({
 
   return (
     <div>
-      <div className="sticky top-[65px] z-20 -mx-4 overflow-x-auto border-b border-line bg-paper px-4 py-2 sm:mx-0 sm:rounded-lg sm:border">
-        <div className="flex min-w-max gap-2">
-          {TABS.map((tab) => (
+      <div className="sticky top-[65px] z-20 -mx-4 border-b border-line bg-paper px-3 py-2 sm:mx-0 sm:rounded-lg sm:border sm:px-4">
+        <div className="grid grid-cols-4 gap-1.5 sm:flex sm:min-w-max sm:gap-2">
+          {TABS.map((tab) => {
+            const Icon = TAB_ICONS[tab];
+
+            return (
             <button
               key={tab}
-              className={`h-10 rounded-lg px-3 text-sm font-black ${activeTab === tab ? "bg-moss text-white" : "bg-white text-ink"}`}
+              className={`flex h-14 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-black leading-tight sm:h-10 sm:flex-row sm:px-3 sm:text-sm ${
+                activeTab === tab ? "bg-moss text-white shadow-soft" : "bg-white text-ink"
+              }`}
               onClick={() => setActiveTab(tab)}
               type="button"
             >
+              <Icon size={17} />
               {tab}
             </button>
-          ))}
+            );
+          })}
         </div>
       </div>
 
