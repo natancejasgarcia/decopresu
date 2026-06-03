@@ -3,11 +3,12 @@
 import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Calculator, ChevronDown, ChevronUp, Download, GripVertical, Pencil, ReceiptText, Save, Trash2, X } from "lucide-react";
+import { Calculator, ChevronDown, ChevronUp, Download, GripVertical, Pencil, ReceiptText, Save, Sparkles, Trash2, X } from "lucide-react";
 import {
   createBudgetItemAction,
   createBudgetItemsFromRoomsAction,
   deleteBudgetItemAction,
+  generateBudgetItemsWithAIAction,
   reorderBudgetItemsAction,
   updateBudgetItemAction,
 } from "@/actions/budgetActions";
@@ -94,6 +95,24 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
     });
   }
 
+  function handleAIGenerate() {
+    const formData = new FormData();
+    formData.set("project_id", projectId);
+
+    startTransition(async () => {
+      setFormError(null);
+      const result = await generateBudgetItemsWithAIAction(formData);
+      if (!result?.ok) {
+        setFormError(result?.error ?? "No se pudo generar el presupuesto con IA.");
+        return;
+      }
+      if (result.items?.length) {
+        setOrderedItems((currentItems) => sortBudgetItems([...currentItems, ...result.items]));
+      }
+      router.refresh();
+    });
+  }
+
   function handleUpdate(event: FormEvent<HTMLFormElement>, itemId: string) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
@@ -163,12 +182,29 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
   return (
     <section className="section-panel">
       <div className="section-heading">
-        <h2>Presupuesto</h2>
-        <Link className="inline-flex h-10 items-center gap-2 rounded-lg border border-line px-3 text-sm font-black text-ink" href={`/projects/${projectId}/budget/pdf`}>
-          <Download size={17} />
-          Descargar PDF
-        </Link>
+        <div>
+          <h2>Presupuesto</h2>
+          <p className="mt-1 text-sm text-muted">Crea conceptos manuales o deja que la IA rellene cards editables desde los archivos de la obra.</p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-ink px-3 text-sm font-black text-white disabled:opacity-60"
+            disabled={isPending}
+            onClick={handleAIGenerate}
+            type="button"
+          >
+            <Sparkles size={17} />
+            {isPending ? "Pensando..." : "Hacer con IA"}
+          </button>
+          <Link className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line px-3 text-sm font-black text-ink" href={`/projects/${projectId}/budget/pdf`}>
+            <Download size={17} />
+            Descargar PDF
+          </Link>
+        </div>
       </div>
+      {formError ? (
+        <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm font-black text-red-700">{formError}</p>
+      ) : null}
 
       <form onSubmit={handleRoomBudgetSubmit} className="mb-4 grid gap-3 rounded-lg border border-line bg-white p-3">
         <input type="hidden" name="project_id" value={projectId} />
@@ -250,9 +286,6 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
           <ReceiptText size={18} />
           Anadir linea
         </button>
-        {formError ? (
-          <p className="rounded-lg bg-red-50 p-3 text-sm font-black text-red-700">{formError}</p>
-        ) : null}
       </form>
 
       <div className="mt-5 grid gap-2">

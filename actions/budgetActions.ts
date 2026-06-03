@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUserProfile } from "@/lib/auth";
 import { formatCurrency } from "@/lib/calculations";
-import type { Room, RoomModule } from "@/lib/types";
+import type { BudgetItem, Project, ProjectFile, Room, RoomModule } from "@/lib/types";
 
 type Supabase = Awaited<ReturnType<typeof requireUserProfile>>["supabase"];
 
@@ -16,6 +16,23 @@ const budgetItemSchema = z.object({
   unit: z.preprocess((value) => (typeof value === "string" ? value.trim() : ""), z.string()),
   unit_price: z.preprocess(normalizeDecimalInput, z.coerce.number().min(0)),
 });
+
+const generatedBudgetSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        concept: z.string().trim().min(1).max(140),
+        notes: z.string().trim().max(1800).optional().nullable(),
+        quantity: z.coerce.number().positive().default(1),
+        unit: z.string().trim().max(20).optional().nullable(),
+        unit_price: z.coerce.number().min(0),
+      }),
+    )
+    .min(1)
+    .max(8),
+});
+
+type GeneratedBudgetItem = z.infer<typeof generatedBudgetSchema>["items"][number];
 
 export async function createBudgetItemAction(formData: FormData) {
   const { supabase } = await requireUserProfile();
@@ -64,6 +81,104 @@ export async function createBudgetItemAction(formData: FormData) {
       created_at: createdAt,
     },
   };
+}
+
+export async function generateBudgetItemsWithAIAction(formData: FormData) {
+  const { supabase } = await requireUserProfile();
+  const projectId = z.string().uuid().safeParse(formData.get("project_id"));
+
+  if (!projectId.success) {
+    return { ok: false, error: "No se encontro la obra para generar el presupuesto." };
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return { ok: false, error: "Falta OPENAI_API_KEY en las variables de entorno." };
+  }
+
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("id", projectId.data)
+    .single<Project>();
+
+  if (projectError || !project) {
+    return { ok: false, error: projectError?.message ?? "No se pudo leer la obra." };
+  }
+
+  const { data: files, error: filesError } = await supabase
+    .from("project_files")
+    .select("*")
+    .eq("project_id", projectId.data)
+    .order("created_at", { ascending: false })
+    .limit(12)
+    .returns<ProjectFile[]>();
+
+  if (filesError) {
+    return { ok: false, error: filesError.message };
+  }
+
+  const imageUrls = await getProjectImageSignedUrls(supabase, files ?? []);
+  const prompt = buildAIBudgetPrompt(project, files ?? []);
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: process.env.OPENAI_MODEL ?? "gpt-4o",
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "Eres un presupuestador experto para Decoralia Pintores. Generas conceptos claros, profesionales y editables para presupuestos de pintura, laca, barnizado, microcemento y reparaciones. Responde solo JSON valido.",
+        },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            ...imageUrls.map((url) => ({
+              type: "image_url",
+              image_url: { url },
+            })),
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    return { ok: false, error: `OpenAI no pudo generar el presupuesto: ${errorText.slice(0, 240)}` };
+  }
+
+  const completion = await response.json();
+  const content = completion?.choices?.[0]?.message?.content;
+  const json = parseAIJson(content);
+  const parsed = generatedBudgetSchema.safeParse(json);
+
+  if (!parsed.success) {
+    return { ok: false, error: "La IA no devolvio conceptos validos. Prueba con mas datos o fotos del proyecto." };
+  }
+
+  const createdItems = await insertGeneratedBudgetItems(supabase, projectId.data, parsed.data.items);
+
+  if (!createdItems.ok) {
+    return { ok: false, error: createdItems.error };
+  }
+
+  await supabase
+    .from("projects")
+    .update({ status: "Presupuestado", last_activity_at: new Date().toISOString() })
+    .eq("id", projectId.data);
+
+  revalidatePath(`/projects/${projectId.data}`);
+  revalidatePath("/dashboard");
+  return { ok: true, items: createdItems.items };
 }
 
 export async function updateBudgetItemAction(formData: FormData) {
@@ -302,4 +417,99 @@ async function insertBudgetRows(supabase: Supabase, rows: Array<Record<string, u
   }
 
   return result;
+}
+
+async function getProjectImageSignedUrls(supabase: Supabase, files: ProjectFile[]) {
+  const imageFiles = files.filter((file) => file.file_type.startsWith("image/")).slice(0, 8);
+  const signedUrls = await Promise.all(
+    imageFiles.map(async (file) => {
+      const { data } = await supabase.storage.from("project-files").createSignedUrl(file.file_url, 60 * 30);
+      return data?.signedUrl ?? null;
+    }),
+  );
+
+  return signedUrls.filter((url): url is string => Boolean(url));
+}
+
+function buildAIBudgetPrompt(project: Project, files: ProjectFile[]) {
+  const fileSummary = files.length
+    ? files.map((file) => `- ${file.file_name} (${file.file_type})`).join("\n")
+    : "No hay archivos subidos.";
+
+  return `
+Genera lineas normales de presupuesto para esta obra de Decoralia Pintores.
+
+Datos de la obra:
+- Nombre: ${project.name}
+- Tipo: ${project.project_type}
+- Cliente: ${project.client_name}
+- Direccion: ${project.address}
+- Descripcion: ${project.description || "Sin descripcion"}
+- Notas internas: ${project.internal_notes || "Sin notas internas"}
+
+Archivos disponibles:
+${fileSummary}
+
+Reglas:
+- Devuelve solo JSON con esta forma exacta: {"items":[{"concept":"...","notes":"...","quantity":1,"unit":"","unit_price":260}]}
+- Cada item debe ser una card editable del presupuesto.
+- Si no hay medidas claras, usa precio cerrado con quantity 1, unit "" y unit_price con el precio final sin IVA.
+- Si hay medidas claras, puedes usar unit "m2", "ud" u otra unidad corta.
+- No calcules IVA, todos los precios son sin IVA.
+- No inventes medidas exactas si no aparecen en la informacion; explica dudas o supuestos en notes.
+- Conceptos y notas en espanol, con tono profesional para cliente.
+- Maximo 5 lineas, agrupadas de forma practica para poder editarlas despues.
+`.trim();
+}
+
+function parseAIJson(content: unknown) {
+  if (typeof content !== "string") return null;
+  try {
+    return JSON.parse(content);
+  } catch {
+    const match = content.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try {
+      return JSON.parse(match[0]);
+    } catch {
+      return null;
+    }
+  }
+}
+
+async function insertGeneratedBudgetItems(supabase: Supabase, projectId: string, generatedItems: GeneratedBudgetItem[]) {
+  const firstSortOrder = await getNextBudgetSortOrder(supabase, projectId);
+  const createdAt = new Date().toISOString();
+  const rows = generatedItems.map((item, index) => ({
+    id: crypto.randomUUID(),
+    project_id: projectId,
+    concept: item.concept,
+    notes: item.notes || null,
+    quantity: item.quantity,
+    unit: item.unit ?? "",
+    unit_price: item.unit_price,
+    sort_order: firstSortOrder + index,
+    created_at: createdAt,
+  }));
+
+  const { error } = await insertBudgetRows(supabase, rows);
+
+  if (error) {
+    return { ok: false as const, error: error.message };
+  }
+
+  const items: BudgetItem[] = rows.map((row) => ({
+    id: row.id,
+    project_id: row.project_id,
+    concept: row.concept,
+    notes: row.notes,
+    quantity: row.quantity,
+    unit: row.unit,
+    unit_price: row.unit_price,
+    total: Math.round(row.quantity * row.unit_price * 100) / 100,
+    sort_order: row.sort_order,
+    created_at: row.created_at,
+  }));
+
+  return { ok: true as const, items };
 }
