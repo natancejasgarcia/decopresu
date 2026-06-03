@@ -122,9 +122,25 @@ export async function generateBudgetItemsWithAIAction(formData: FormData) {
     return { ok: false, error: filesError.message };
   }
 
+  const { data: rooms } = await supabase
+    .from("rooms")
+    .select("*")
+    .eq("project_id", projectId.data)
+    .order("created_at", { ascending: true })
+    .returns<Room[]>();
+
+  const { data: modules, error: modulesError } = await supabase
+    .from("room_modules")
+    .select("*")
+    .eq("project_id", projectId.data)
+    .order("created_at", { ascending: true })
+    .returns<RoomModule[]>();
+
+  const roomModules = isOptionalRoomModulesError(modulesError) ? [] : (modules ?? []);
+  const measurementsText = buildAIMeasurementsSummary(rooms ?? [], roomModules);
   const imageUrls = await getProjectImageSignedUrls(supabase, files ?? []);
   const documentText = await getProjectDocumentText(supabase, files ?? []);
-  const prompt = buildAIBudgetPrompt(project, files ?? [], documentText);
+  const prompt = buildAIBudgetPrompt(project, files ?? [], documentText, measurementsText);
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -140,7 +156,7 @@ export async function generateBudgetItemsWithAIAction(formData: FormData) {
         {
           role: "system",
           content:
-            "Eres un presupuestador experto para Decoralia Pintores. Generas conceptos claros, profesionales y editables para presupuestos de pintura, laca, barnizado, microcemento y reparaciones. Responde solo JSON valido.",
+            "Eres un presupuestador experto para Decoralia Pintores. Analizas toda la informacion disponible de una obra, sacas una conclusion profesional de lo que hay que hacer y la conviertes en partidas editables de presupuesto. Responde solo JSON valido.",
         },
         {
           role: "user",
@@ -655,7 +671,39 @@ function truncateText(value: string, maxLength: number) {
   return `${value.slice(0, maxLength)}\n[Texto recortado por longitud]`;
 }
 
-function buildAIBudgetPrompt(project: Project, files: ProjectFile[], documentText: string) {
+function buildAIMeasurementsSummary(rooms: Room[], modules: RoomModule[]) {
+  if (rooms.length === 0 && modules.length === 0) {
+    return "No hay mediciones creadas en la pestana Medidas.";
+  }
+
+  const modulesByRoom = new Map<string, RoomModule[]>();
+  for (const module of modules) {
+    modulesByRoom.set(module.room_id, [...(modulesByRoom.get(module.room_id) ?? []), module]);
+  }
+
+  const roomLines = rooms.map((room) => {
+    const moduleLines = (modulesByRoom.get(room.id) ?? [])
+      .map((module) => {
+        const unit = module.unit ? ` ${module.unit}` : "";
+        return `  - Modulo ${getModuleTypeLabel(module.module_type)}: ${module.concept}, ${Number(module.quantity)}${unit} x ${formatCurrency(Number(module.unit_price))} = ${formatCurrency(Number(module.total))}${module.notes ? `. Notas: ${module.notes}` : ""}`;
+      })
+      .join("\n");
+
+    const baseLine = `- ${room.name}: ${getRoomScopeLabel(room)}, ${Number(room.total_paintable_area).toFixed(2)} m2 x ${formatCurrency(Number(room.unit_price ?? 0))}${room.notes ? `. Notas: ${room.notes}` : ""}`;
+    return moduleLines ? `${baseLine}\n${moduleLines}` : baseLine;
+  });
+
+  return roomLines.join("\n");
+}
+
+function getRoomScopeLabel(room: Room) {
+  if (room.paint_scope === "manual_area") return "m2 directos";
+  if (room.paint_scope === "ceiling_only") return "solo techo";
+  if (room.paint_scope === "walls_only") return "solo paredes";
+  return "techo y paredes";
+}
+
+function buildAIBudgetPrompt(project: Project, files: ProjectFile[], documentText: string, measurementsText: string) {
   const fileSummary = files.length
     ? files.map((file) => `- ${file.file_name} (${file.file_type})`).join("\n")
     : "No hay archivos subidos.";
@@ -677,15 +725,24 @@ ${fileSummary}
 Texto extraido de documentos, PDFs o notas:
 ${documentText || "No se pudo extraer texto adicional."}
 
+Mediciones y zonas ya creadas en la obra:
+${measurementsText}
+
 Reglas:
 - Devuelve solo JSON con esta forma exacta: {"items":[{"concept":"...","notes":"...","quantity":1,"unit":"","unit_price":260}]}
 - Cada item debe ser una card editable del presupuesto.
+- Primero haz una conclusion interna de lo que pide el cliente: zonas, superficies, elementos, reparaciones, acabados, materiales y dudas.
+- Convierte esa conclusion en partidas de presupuesto por zona o por trabajo real: por ejemplo "Escalera - barnizado de pasamanos", "Banos - microcemento paredes", "Salon - pintura techo y paredes".
+- Si hay habitaciones o zonas medidas, respeta esas zonas y reflejalas como partidas o dentro de las notas.
+- Si detectas varias zonas en fotos/documentos, separalas en varias partidas siempre que ayude a entender el presupuesto.
 - Si no hay medidas claras, usa precio cerrado con quantity 1, unit "" y unit_price con el precio final sin IVA.
-- Si hay medidas claras, puedes usar unit "m2", "ud" u otra unidad corta.
+- Si hay medidas claras, puedes usar unit "m2", "ud", "ml" u otra unidad corta.
 - No calcules IVA, todos los precios son sin IVA.
 - No inventes medidas exactas si no aparecen en la informacion; explica dudas o supuestos en notes.
+- En notes resume que has visto o leido, que incluye la partida y cualquier supuesto importante.
+- No generes una partida generica llamada "trabajos a realizar"; usa conceptos concretos.
 - Conceptos y notas en espanol, con tono profesional para cliente.
-- Maximo 5 lineas, agrupadas de forma practica para poder editarlas despues.
+- Maximo 8 lineas, agrupadas de forma practica para poder editarlas despues.
 `.trim();
 }
 
