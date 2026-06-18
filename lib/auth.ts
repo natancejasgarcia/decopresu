@@ -43,6 +43,23 @@ async function createAutoAuthorizedProfile(user: User) {
     return null;
   }
 
+  const { data: sessionProfile, error: sessionError } = await createServerSupabaseClient()
+    .from("profiles")
+    .upsert(
+      {
+        user_id: user.id,
+        name: authorizedProfile.name,
+        role: authorizedProfile.role,
+      },
+      { onConflict: "user_id" },
+    )
+    .select("*")
+    .single<Profile>();
+
+  if (!sessionError && sessionProfile) {
+    return sessionProfile;
+  }
+
   try {
     const serviceSupabase = createServiceSupabaseClient();
     const { data, error } = await serviceSupabase
