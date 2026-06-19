@@ -18,12 +18,14 @@ type DailyNotesPanelProps = {
 const timeFormatter = new Intl.DateTimeFormat("es-ES", {
   hour: "2-digit",
   minute: "2-digit",
+  timeZone: "Europe/Madrid",
 });
 
 const dateFormatter = new Intl.DateTimeFormat("es-ES", {
   day: "2-digit",
   month: "long",
   year: "numeric",
+  timeZone: "Europe/Madrid",
 });
 
 export function DailyNotesPanel({ notes, selectedDate, availableDates, projects }: DailyNotesPanelProps) {
@@ -311,5 +313,5 @@ function formatDateLabel(date: string) {
 }
 
 function formatShortDate(date: string) {
-  return new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short" }).format(new Date(`${date}T12:00:00`));
+  return new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", timeZone: "Europe/Madrid" }).format(new Date(`${date}T12:00:00`));
 }
