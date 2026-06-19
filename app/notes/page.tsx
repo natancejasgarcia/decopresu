@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { DailyNotesPanel } from "@/components/DailyNotesPanel";
 import { TopBar } from "@/components/TopBar";
 import { requireUserProfile } from "@/lib/auth";
-import type { DailyNote, Profile } from "@/lib/types";
+import type { DailyNote, DailyNoteFile, Profile, Project } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +21,7 @@ export default async function NotesPage({ searchParams }: NotesPageProps) {
     { data: dailyNotes, error: dailyNotesError },
     { data: recentNotes, error: recentNotesError },
     { data: profiles, error: profilesError },
+    { data: projects, error: projectsError },
   ] = await Promise.all([
     supabase
       .from("daily_notes")
@@ -37,19 +38,59 @@ export default async function NotesPage({ searchParams }: NotesPageProps) {
       .limit(80)
       .returns<Pick<DailyNote, "note_date">[]>(),
     supabase.from("profiles").select("*").returns<Profile[]>(),
+    supabase
+      .from("projects")
+      .select("id,name,client_name")
+      .order("last_activity_at", { ascending: false })
+      .returns<Pick<Project, "id" | "name" | "client_name">[]>(),
   ]);
 
   const dailyNotesUnavailable = isOptionalNotesError(dailyNotesError);
   const recentNotesUnavailable = isOptionalNotesError(recentNotesError);
 
-  if (profilesError || (!dailyNotesUnavailable && dailyNotesError) || (!recentNotesUnavailable && recentNotesError)) {
-    throw new Error(profilesError?.message ?? dailyNotesError?.message ?? recentNotesError?.message);
+  if (profilesError || projectsError || (!dailyNotesUnavailable && dailyNotesError) || (!recentNotesUnavailable && recentNotesError)) {
+    throw new Error(profilesError?.message ?? projectsError?.message ?? dailyNotesError?.message ?? recentNotesError?.message);
   }
 
+  const baseNotes = dailyNotesUnavailable ? [] : dailyNotes ?? [];
+  const noteIds = baseNotes.map((note) => note.id);
+  const { data: noteFiles, error: noteFilesError } = noteIds.length
+    ? await supabase
+        .from("daily_note_files")
+        .select("*")
+        .in("note_id", noteIds)
+        .order("created_at", { ascending: true })
+        .returns<DailyNoteFile[]>()
+    : { data: [] as DailyNoteFile[], error: null };
+  const noteFilesUnavailable = isOptionalNotesError(noteFilesError);
+
+  if (!noteFilesUnavailable && noteFilesError) {
+    throw new Error(noteFilesError.message);
+  }
+
+  const signedFiles = await Promise.all(
+    (noteFilesUnavailable ? [] : noteFiles ?? []).map(async (file) => {
+      const { data } = await supabase.storage.from("project-files").createSignedUrl(file.file_url, 60 * 60);
+      return { ...file, signed_url: data?.signedUrl };
+    }),
+  );
+
   const profileNames = new Map((profiles ?? []).map((item) => [item.user_id, item.name]));
-  const enrichedDailyNotes = (dailyNotesUnavailable ? [] : dailyNotes ?? []).map((note) => ({
+  const projectsById = new Map((projects ?? []).map((project) => [project.id, project]));
+  const filesByNote = new Map<string, DailyNoteFile[]>();
+
+  for (const file of signedFiles) {
+    const files = filesByNote.get(file.note_id) ?? [];
+    files.push(file);
+    filesByNote.set(file.note_id, files);
+  }
+
+  const enrichedDailyNotes = baseNotes.map((note) => ({
     ...note,
     author_name: profileNames.get(note.created_by) ?? "Decoralia",
+    project_name: note.project_id ? projectsById.get(note.project_id)?.name : undefined,
+    project_client_name: note.project_id ? projectsById.get(note.project_id)?.client_name : undefined,
+    files: filesByNote.get(note.id) ?? [],
   }));
   const availableDates = [...new Set((recentNotesUnavailable ? [] : recentNotes ?? []).map((note) => note.note_date))];
 
@@ -61,7 +102,12 @@ export default async function NotesPage({ searchParams }: NotesPageProps) {
           <ArrowLeft size={17} />
           Inicio
         </Link>
-        <DailyNotesPanel notes={enrichedDailyNotes} selectedDate={selectedDate} availableDates={availableDates} />
+        <DailyNotesPanel
+          notes={enrichedDailyNotes}
+          selectedDate={selectedDate}
+          availableDates={availableDates}
+          projects={projects ?? []}
+        />
       </div>
     </main>
   );

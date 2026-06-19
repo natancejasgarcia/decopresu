@@ -70,11 +70,26 @@ export type DailyNote = {
   id: string;
   text: string;
   note_date: string;
+  project_id: string | null;
   created_by: string;
   is_done: boolean;
   created_at: string;
   updated_at: string;
   author_name?: string;
+  project_name?: string;
+  project_client_name?: string;
+  files?: DailyNoteFile[];
+};
+
+export type DailyNoteFile = {
+  id: string;
+  note_id: string;
+  uploaded_by: string | null;
+  file_name: string;
+  file_url: string;
+  file_type: string;
+  created_at: string;
+  signed_url?: string;
 };
 
 export type BudgetValidation = {

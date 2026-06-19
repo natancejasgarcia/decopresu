@@ -80,10 +80,21 @@ create table if not exists public.daily_notes (
   id uuid primary key default gen_random_uuid(),
   text text not null,
   note_date date not null default current_date,
+  project_id uuid references public.projects(id) on delete set null,
   created_by uuid not null references public.profiles(user_id) on delete cascade,
   is_done boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+create table if not exists public.daily_note_files (
+  id uuid primary key default gen_random_uuid(),
+  note_id uuid not null references public.daily_notes(id) on delete cascade,
+  uploaded_by uuid references public.profiles(user_id) on delete set null,
+  file_name text not null,
+  file_url text not null unique,
+  file_type text not null,
+  created_at timestamptz not null default now()
 );
 
 create table if not exists public.budget_validations (
@@ -243,6 +254,8 @@ create index if not exists messages_project_id_created_at_idx on public.messages
 create index if not exists project_reads_user_project_idx on public.project_reads(user_id, project_id);
 create index if not exists dashboard_dismissals_user_day_idx on public.dashboard_dismissals(user_id, dismissed_on);
 create index if not exists daily_notes_date_done_idx on public.daily_notes(note_date desc, is_done, created_at desc);
+create index if not exists daily_notes_project_date_idx on public.daily_notes(project_id, note_date desc);
+create index if not exists daily_note_files_note_created_idx on public.daily_note_files(note_id, created_at);
 create index if not exists budget_validations_created_at_idx on public.budget_validations(created_at desc);
 create index if not exists budget_validations_status_idx on public.budget_validations(is_validated, created_at desc);
 create index if not exists budget_validations_project_idx on public.budget_validations(project_id, created_at desc);
@@ -266,6 +279,7 @@ alter table public.messages enable row level security;
 alter table public.project_reads enable row level security;
 alter table public.dashboard_dismissals enable row level security;
 alter table public.daily_notes enable row level security;
+alter table public.daily_note_files enable row level security;
 alter table public.budget_validations enable row level security;
 alter table public.project_files enable row level security;
 alter table public.rooms enable row level security;
@@ -389,6 +403,31 @@ with check (public.is_decoralia_user());
 drop policy if exists "daily_notes_delete_authorized" on public.daily_notes;
 create policy "daily_notes_delete_authorized"
 on public.daily_notes for delete
+to authenticated
+using (public.is_decoralia_user());
+
+drop policy if exists "daily_note_files_select_authorized" on public.daily_note_files;
+create policy "daily_note_files_select_authorized"
+on public.daily_note_files for select
+to authenticated
+using (public.is_decoralia_user());
+
+drop policy if exists "daily_note_files_insert_own" on public.daily_note_files;
+create policy "daily_note_files_insert_own"
+on public.daily_note_files for insert
+to authenticated
+with check (public.is_decoralia_user() and uploaded_by = auth.uid());
+
+drop policy if exists "daily_note_files_update_authorized" on public.daily_note_files;
+create policy "daily_note_files_update_authorized"
+on public.daily_note_files for update
+to authenticated
+using (public.is_decoralia_user())
+with check (public.is_decoralia_user());
+
+drop policy if exists "daily_note_files_delete_authorized" on public.daily_note_files;
+create policy "daily_note_files_delete_authorized"
+on public.daily_note_files for delete
 to authenticated
 using (public.is_decoralia_user());
 
@@ -542,6 +581,7 @@ values (
     'image/png',
     'image/webp',
     'image/heic',
+    'image/gif',
     'application/pdf',
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

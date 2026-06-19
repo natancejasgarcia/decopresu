@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { CalendarDays, CheckCircle2, NotebookPen, RotateCcw, Trash2 } from "lucide-react";
+import { CalendarDays, CheckCircle2, FolderKanban, ImagePlus, NotebookPen, RotateCcw, Trash2 } from "lucide-react";
 import { createDailyNoteAction, deleteDailyNoteAction, toggleDailyNoteAction } from "@/actions/dailyNoteActions";
-import type { DailyNote } from "@/lib/types";
+import type { DailyNote, Project } from "@/lib/types";
 
 type DailyNotesPanelProps = {
   notes: DailyNote[];
   selectedDate: string;
   availableDates: string[];
+  projects: Pick<Project, "id" | "name" | "client_name">[];
 };
 
 const timeFormatter = new Intl.DateTimeFormat("es-ES", {
@@ -20,7 +21,7 @@ const dateFormatter = new Intl.DateTimeFormat("es-ES", {
   year: "numeric",
 });
 
-export function DailyNotesPanel({ notes, selectedDate, availableDates }: DailyNotesPanelProps) {
+export function DailyNotesPanel({ notes, selectedDate, availableDates, projects }: DailyNotesPanelProps) {
   const pendingNotes = notes.filter((note) => !note.is_done);
   const doneNotes = notes.filter((note) => note.is_done);
   const previousDate = shiftDate(selectedDate, -1);
@@ -65,8 +66,16 @@ export function DailyNotesPanel({ notes, selectedDate, availableDates }: DailyNo
         </p>
       </div>
 
-      <form action={createDailyNoteAction} className="mt-4 grid gap-2">
+      <form action={createDailyNoteAction} className="mt-4 grid gap-2" encType="multipart/form-data">
         <input type="hidden" name="note_date" value={selectedDate} />
+        <select className="form-input" name="project_id" defaultValue="">
+          <option value="">Sin obra vinculada</option>
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name} - {project.client_name}
+            </option>
+          ))}
+        </select>
         <textarea
           className="form-input min-h-28"
           name="text"
@@ -74,6 +83,13 @@ export function DailyNotesPanel({ notes, selectedDate, availableDates }: DailyNo
           maxLength={2000}
           required
         />
+        <label className="flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-lg border border-line bg-white px-4 text-sm font-black text-ink">
+          <span className="inline-flex items-center gap-2">
+            <ImagePlus size={18} className="text-moss" />
+            Fotos de la nota
+          </span>
+          <input className="max-w-[190px] text-xs font-bold text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-moss file:px-3 file:py-2 file:font-black file:text-white" name="photos" type="file" accept="image/*" multiple />
+        </label>
         <button className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-moss px-5 font-black text-white" type="submit">
           <NotebookPen size={18} />
           Guardar apunte
@@ -131,12 +147,41 @@ function DailyNoteRow({ note, selectedDate }: { note: DailyNote; selectedDate: s
     <article className={`rounded-lg border p-3 ${note.is_done ? "border-line bg-paper/70 text-muted" : "border-line bg-white"}`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
+          {note.project_id ? (
+            <Link
+              href={`/projects/${note.project_id}`}
+              className="mb-2 inline-flex max-w-full items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-moss"
+            >
+              <FolderKanban size={14} />
+              <span className="truncate">
+                {note.project_name ?? "Obra vinculada"}
+                {note.project_client_name ? ` - ${note.project_client_name}` : ""}
+              </span>
+            </Link>
+          ) : null}
           <p className={`whitespace-pre-wrap text-sm font-bold ${note.is_done ? "line-through decoration-2" : "text-ink"}`}>
             {note.text}
           </p>
           <p className="mt-1 text-xs font-semibold text-muted">
             {note.author_name ?? "Decoralia"} - {timeFormatter.format(createdAt)}
           </p>
+          {note.files && note.files.length > 0 ? (
+            <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
+              {note.files.map((file) => (
+                <a
+                  key={file.id}
+                  href={file.signed_url ?? "#"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block overflow-hidden rounded-lg border border-line bg-paper"
+                  title={file.file_name}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={file.signed_url} alt={file.file_name} className="aspect-square w-full object-cover" />
+                </a>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="flex shrink-0 gap-2">
           <form action={toggleDailyNoteAction}>
