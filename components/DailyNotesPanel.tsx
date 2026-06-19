@@ -1,4 +1,9 @@
+"use client";
+
 import Link from "next/link";
+import { useRef, useState } from "react";
+import type { ChangeEvent, ClipboardEvent, KeyboardEvent, MouseEvent } from "react";
+import { useRouter } from "next/navigation";
 import { CalendarDays, CheckCircle2, FolderKanban, ImagePlus, NotebookPen, RotateCcw, Trash2 } from "lucide-react";
 import { createDailyNoteAction, deleteDailyNoteAction, toggleDailyNoteAction } from "@/actions/dailyNoteActions";
 import type { DailyNote, Project } from "@/lib/types";
@@ -66,35 +71,7 @@ export function DailyNotesPanel({ notes, selectedDate, availableDates, projects 
         </p>
       </div>
 
-      <form action={createDailyNoteAction} className="mt-4 grid gap-2" encType="multipart/form-data">
-        <input type="hidden" name="note_date" value={selectedDate} />
-        <select className="form-input" name="project_id" defaultValue="">
-          <option value="">Sin obra vinculada</option>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name} - {project.client_name}
-            </option>
-          ))}
-        </select>
-        <textarea
-          className="form-input min-h-28"
-          name="text"
-          placeholder="Ej: Hoy se ha preparado el salon, tapado suelo, reparado grietas y queda pendiente dar segunda mano..."
-          maxLength={2000}
-          required
-        />
-        <label className="flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-lg border border-line bg-white px-4 text-sm font-black text-ink">
-          <span className="inline-flex items-center gap-2">
-            <ImagePlus size={18} className="text-moss" />
-            Fotos de la nota
-          </span>
-          <input className="max-w-[190px] text-xs font-bold text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-moss file:px-3 file:py-2 file:font-black file:text-white" name="photos" type="file" accept="image/*" multiple />
-        </label>
-        <button className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-moss px-5 font-black text-white" type="submit">
-          <NotebookPen size={18} />
-          Guardar apunte
-        </button>
-      </form>
+      <DailyNoteForm selectedDate={selectedDate} projects={projects} />
 
       <div className="mt-4 grid gap-2">
         {notes.length === 0 ? (
@@ -140,11 +117,116 @@ export function DailyNotesPanel({ notes, selectedDate, availableDates, projects 
   );
 }
 
-function DailyNoteRow({ note, selectedDate }: { note: DailyNote; selectedDate: string }) {
-  const createdAt = new Date(note.created_at);
+function DailyNoteForm({ selectedDate, projects }: { selectedDate: string; projects: Pick<Project, "id" | "name" | "client_name">[] }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [fileNames, setFileNames] = useState<string[]>([]);
+
+  function refreshFileNames(input: HTMLInputElement | null) {
+    setFileNames(Array.from(input?.files ?? []).map((file) => file.name));
+  }
+
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    refreshFileNames(event.currentTarget);
+  }
+
+  function handlePaste(event: ClipboardEvent<HTMLFormElement>) {
+    const pastedImages = Array.from(event.clipboardData.items)
+      .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => Boolean(file));
+
+    if (!pastedImages.length || !fileInputRef.current) return;
+
+    event.preventDefault();
+
+    const transfer = new DataTransfer();
+    for (const file of Array.from(fileInputRef.current.files ?? [])) {
+      transfer.items.add(file);
+    }
+
+    pastedImages.forEach((file, index) => {
+      const extension = file.type.split("/")[1] || "png";
+      const pastedFile = new File([file], `pantallazo-nota-${Date.now()}-${index + 1}.${extension}`, { type: file.type });
+      transfer.items.add(pastedFile);
+    });
+
+    fileInputRef.current.files = transfer.files;
+    refreshFileNames(fileInputRef.current);
+  }
 
   return (
-    <article className={`rounded-lg border p-3 ${note.is_done ? "border-line bg-paper/70 text-muted" : "border-line bg-white"}`}>
+    <form action={createDailyNoteAction} className="mt-4 grid gap-2" encType="multipart/form-data" onPaste={handlePaste}>
+      <input type="hidden" name="note_date" value={selectedDate} />
+      <select className="form-input" name="project_id" defaultValue="">
+        <option value="">Sin obra vinculada</option>
+        {projects.map((project) => (
+          <option key={project.id} value={project.id}>
+            {project.name} - {project.client_name}
+          </option>
+        ))}
+      </select>
+      <textarea
+        className="form-input min-h-28"
+        name="text"
+        placeholder="Escribe la nota. Si haces un pantallazo, puedes pegarlo aqui con Ctrl+V y se anadira a fotos..."
+        maxLength={2000}
+        required
+      />
+      <label className="flex min-h-12 cursor-pointer flex-col justify-center gap-2 rounded-lg border border-line bg-white px-4 py-3 text-sm font-black text-ink sm:flex-row sm:items-center sm:justify-between">
+        <span className="inline-flex items-center gap-2">
+          <ImagePlus size={18} className="text-moss" />
+          Fotos de la nota
+        </span>
+        <input
+          ref={fileInputRef}
+          className="max-w-full text-xs font-bold text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-moss file:px-3 file:py-2 file:font-black file:text-white"
+          name="photos"
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleFileChange}
+        />
+      </label>
+      {fileNames.length > 0 ? (
+        <div className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-black text-moss">
+          {fileNames.length} foto{fileNames.length === 1 ? "" : "s"} preparada{fileNames.length === 1 ? "" : "s"}: {fileNames.join(", ")}
+        </div>
+      ) : null}
+      <button className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-moss px-5 font-black text-white" type="submit">
+        <NotebookPen size={18} />
+        Guardar apunte
+      </button>
+    </form>
+  );
+}
+
+function DailyNoteRow({ note, selectedDate }: { note: DailyNote; selectedDate: string }) {
+  const router = useRouter();
+  const createdAt = new Date(note.created_at);
+  const projectHref = note.project_id ? `/projects/${note.project_id}` : null;
+
+  function openLinkedProject(event: MouseEvent<HTMLElement>) {
+    if (!projectHref || isInteractiveTarget(event.target)) return;
+    router.push(projectHref);
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (!projectHref || isInteractiveTarget(event.target)) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      router.push(projectHref);
+    }
+  }
+
+  return (
+    <article
+      className={`rounded-lg border p-3 ${projectHref ? "cursor-pointer transition hover:border-moss hover:shadow-soft" : ""} ${note.is_done ? "border-line bg-paper/70 text-muted" : "border-line bg-white"}`}
+      onClick={openLinkedProject}
+      onKeyDown={handleKeyDown}
+      role={projectHref ? "button" : undefined}
+      tabIndex={projectHref ? 0 : undefined}
+      title={projectHref ? "Abrir obra vinculada" : undefined}
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           {note.project_id ? (
@@ -212,6 +294,10 @@ function DailyNoteRow({ note, selectedDate }: { note: DailyNote; selectedDate: s
       </div>
     </article>
   );
+}
+
+function isInteractiveTarget(target: EventTarget) {
+  return target instanceof HTMLElement && Boolean(target.closest("a, button, input, select, textarea, label, form"));
 }
 
 function shiftDate(date: string, days: number) {
