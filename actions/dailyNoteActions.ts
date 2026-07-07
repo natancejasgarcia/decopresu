@@ -83,7 +83,7 @@ export async function createDailyNoteAction(formData: FormData) {
 
   revalidatePath("/dashboard");
   revalidatePath("/notes");
-  redirect(`/notes?date=${noteDate}`);
+  return { ok: true };
 }
 
 export async function toggleDailyNoteAction(formData: FormData) {
@@ -128,7 +128,7 @@ export async function updateDailyNoteAction(formData: FormData) {
 
   revalidatePath("/dashboard");
   revalidatePath("/notes");
-  redirect(`/notes?date=${noteDate}`);
+  return { ok: true };
 }
 
 export async function deleteDailyNoteAction(formData: FormData) {

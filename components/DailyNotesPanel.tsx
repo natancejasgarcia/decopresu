@@ -120,8 +120,11 @@ export function DailyNotesPanel({ notes, selectedDate, availableDates, projects 
 }
 
 function DailyNoteForm({ selectedDate, projects }: { selectedDate: string; projects: Pick<Project, "id" | "name" | "client_name">[] }) {
+  const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileNames, setFileNames] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   function refreshFileNames(input: HTMLInputElement | null) {
     setFileNames(Array.from(input?.files ?? []).map((file) => file.name));
@@ -156,8 +159,21 @@ function DailyNoteForm({ selectedDate, projects }: { selectedDate: string; proje
     refreshFileNames(fileInputRef.current);
   }
 
+  async function handleCreate(formData: FormData) {
+    setIsSaving(true);
+
+    try {
+      await createDailyNoteAction(formData);
+      formRef.current?.reset();
+      setFileNames([]);
+      router.refresh();
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
-    <form action={createDailyNoteAction} className="mt-4 grid gap-2" encType="multipart/form-data" onPaste={handlePaste}>
+    <form ref={formRef} action={handleCreate} className="mt-4 grid gap-2" encType="multipart/form-data" onPaste={handlePaste}>
       <input type="hidden" name="note_date" value={selectedDate} />
       <select className="form-input" name="project_id" defaultValue="">
         <option value="">Sin obra vinculada</option>
@@ -194,9 +210,9 @@ function DailyNoteForm({ selectedDate, projects }: { selectedDate: string; proje
           {fileNames.length} foto{fileNames.length === 1 ? "" : "s"} preparada{fileNames.length === 1 ? "" : "s"}: {fileNames.join(", ")}
         </div>
       ) : null}
-      <button className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-moss px-5 font-black text-white" type="submit">
+      <button className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-moss px-5 font-black text-white disabled:opacity-70" disabled={isSaving} type="submit">
         <NotebookPen size={18} />
-        Guardar apunte
+        {isSaving ? "Guardando..." : "Guardar apunte"}
       </button>
     </form>
   );
@@ -213,6 +229,7 @@ function DailyNoteRow({
 }) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const createdAt = new Date(note.created_at);
   const projectHref = note.project_id ? `/projects/${note.project_id}` : null;
 
@@ -229,6 +246,18 @@ function DailyNoteRow({
     }
   }
 
+  async function handleUpdate(formData: FormData) {
+    setIsSaving(true);
+
+    try {
+      await updateDailyNoteAction(formData);
+      setIsEditing(false);
+      router.refresh();
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <article
       className={`rounded-lg border p-3 ${projectHref && !isEditing ? "cursor-pointer transition hover:border-moss hover:shadow-soft" : ""} ${note.is_done ? "border-line bg-paper/70 text-muted" : "border-line bg-white"}`}
@@ -239,7 +268,7 @@ function DailyNoteRow({
       title={projectHref && !isEditing ? "Abrir obra vinculada" : undefined}
     >
       {isEditing ? (
-        <form action={updateDailyNoteAction} className="grid gap-2">
+        <form action={handleUpdate} className="grid gap-2">
           <input type="hidden" name="note_id" value={note.id} />
           <input type="hidden" name="note_date" value={selectedDate} />
           <select className="form-input" name="project_id" defaultValue={note.project_id ?? ""}>
@@ -255,17 +284,18 @@ function DailyNoteRow({
             <button
               className="h-10 rounded-lg border border-line bg-white px-3 text-sm font-black text-ink"
               onClick={() => setIsEditing(false)}
+              disabled={isSaving}
               type="button"
             >
               Cancelar
             </button>
-            <button className="h-10 rounded-lg bg-moss px-4 text-sm font-black text-white" type="submit">
-              Guardar cambios
+            <button className="h-10 rounded-lg bg-moss px-4 text-sm font-black text-white disabled:opacity-70" disabled={isSaving} type="submit">
+              {isSaving ? "Guardando..." : "Guardar cambios"}
             </button>
           </div>
         </form>
       ) : (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
           <div className="min-w-0">
             {note.project_id ? (
               <Link
@@ -303,7 +333,7 @@ function DailyNoteRow({
               </div>
             ) : null}
           </div>
-          <div className="flex shrink-0 gap-2">
+          <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
             <button
               className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-black text-ink"
               onClick={() => setIsEditing(true)}
