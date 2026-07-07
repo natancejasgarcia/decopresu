@@ -106,6 +106,31 @@ export async function toggleDailyNoteAction(formData: FormData) {
   redirect(`/notes?date=${noteDate}`);
 }
 
+export async function updateDailyNoteAction(formData: FormData) {
+  const { supabase } = await requireUserProfile();
+  const noteId = noteIdSchema.parse(formData.get("note_id"));
+  const noteDate = noteDateSchema.parse(formData.get("note_date"));
+  const text = noteTextSchema.parse(formData.get("text"));
+  const projectId = projectIdSchema.parse(formData.get("project_id"));
+
+  const { error } = await supabase
+    .from("daily_notes")
+    .update({
+      text,
+      project_id: projectId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", noteId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/notes");
+  redirect(`/notes?date=${noteDate}`);
+}
+
 export async function deleteDailyNoteAction(formData: FormData) {
   const { supabase } = await requireUserProfile();
   const noteId = noteIdSchema.parse(formData.get("note_id"));

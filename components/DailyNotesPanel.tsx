@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import type { ChangeEvent, ClipboardEvent, KeyboardEvent, MouseEvent } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, CheckCircle2, FolderKanban, ImagePlus, NotebookPen, RotateCcw, Trash2 } from "lucide-react";
-import { createDailyNoteAction, deleteDailyNoteAction, toggleDailyNoteAction } from "@/actions/dailyNoteActions";
+import { CalendarDays, CheckCircle2, FolderKanban, ImagePlus, NotebookPen, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { createDailyNoteAction, deleteDailyNoteAction, toggleDailyNoteAction, updateDailyNoteAction } from "@/actions/dailyNoteActions";
 import type { DailyNote, Project } from "@/lib/types";
 
 type DailyNotesPanelProps = {
@@ -83,14 +83,14 @@ export function DailyNotesPanel({ notes, selectedDate, availableDates, projects 
         ) : (
           <>
             {pendingNotes.map((note) => (
-              <DailyNoteRow key={note.id} note={note} selectedDate={selectedDate} />
+              <DailyNoteRow key={note.id} note={note} selectedDate={selectedDate} projects={projects} />
             ))}
             {doneNotes.length > 0 ? (
               <div className="mt-2 border-t border-line pt-3">
                 <p className="mb-2 text-xs font-black uppercase text-muted">Archivados</p>
                 <div className="grid gap-2">
                   {doneNotes.map((note) => (
-                    <DailyNoteRow key={note.id} note={note} selectedDate={selectedDate} />
+                    <DailyNoteRow key={note.id} note={note} selectedDate={selectedDate} projects={projects} />
                   ))}
                 </div>
               </div>
@@ -202,8 +202,17 @@ function DailyNoteForm({ selectedDate, projects }: { selectedDate: string; proje
   );
 }
 
-function DailyNoteRow({ note, selectedDate }: { note: DailyNote; selectedDate: string }) {
+function DailyNoteRow({
+  note,
+  selectedDate,
+  projects,
+}: {
+  note: DailyNote;
+  selectedDate: string;
+  projects: Pick<Project, "id" | "name" | "client_name">[];
+}) {
   const router = useRouter();
+  const [isEditing, setIsEditing] = useState(false);
   const createdAt = new Date(note.created_at);
   const projectHref = note.project_id ? `/projects/${note.project_id}` : null;
 
@@ -222,52 +231,87 @@ function DailyNoteRow({ note, selectedDate }: { note: DailyNote; selectedDate: s
 
   return (
     <article
-      className={`rounded-lg border p-3 ${projectHref ? "cursor-pointer transition hover:border-moss hover:shadow-soft" : ""} ${note.is_done ? "border-line bg-paper/70 text-muted" : "border-line bg-white"}`}
-      onClick={openLinkedProject}
-      onKeyDown={handleKeyDown}
-      role={projectHref ? "button" : undefined}
-      tabIndex={projectHref ? 0 : undefined}
-      title={projectHref ? "Abrir obra vinculada" : undefined}
+      className={`rounded-lg border p-3 ${projectHref && !isEditing ? "cursor-pointer transition hover:border-moss hover:shadow-soft" : ""} ${note.is_done ? "border-line bg-paper/70 text-muted" : "border-line bg-white"}`}
+      onClick={isEditing ? undefined : openLinkedProject}
+      onKeyDown={isEditing ? undefined : handleKeyDown}
+      role={projectHref && !isEditing ? "button" : undefined}
+      tabIndex={projectHref && !isEditing ? 0 : undefined}
+      title={projectHref && !isEditing ? "Abrir obra vinculada" : undefined}
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          {note.project_id ? (
-            <Link
-              href={`/projects/${note.project_id}`}
-              className="mb-2 inline-flex max-w-full items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-moss"
+      {isEditing ? (
+        <form action={updateDailyNoteAction} className="grid gap-2">
+          <input type="hidden" name="note_id" value={note.id} />
+          <input type="hidden" name="note_date" value={selectedDate} />
+          <select className="form-input" name="project_id" defaultValue={note.project_id ?? ""}>
+            <option value="">Sin obra vinculada</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name} - {project.client_name}
+              </option>
+            ))}
+          </select>
+          <textarea className="form-input min-h-28" name="text" defaultValue={note.text} maxLength={2000} required />
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              className="h-10 rounded-lg border border-line bg-white px-3 text-sm font-black text-ink"
+              onClick={() => setIsEditing(false)}
+              type="button"
             >
-              <FolderKanban size={14} />
-              <span className="truncate">
-                {note.project_name ?? "Obra vinculada"}
-                {note.project_client_name ? ` - ${note.project_client_name}` : ""}
-              </span>
-            </Link>
-          ) : null}
-          <p className={`whitespace-pre-wrap text-sm font-bold ${note.is_done ? "line-through decoration-2" : "text-ink"}`}>
-            {note.text}
-          </p>
-          <p className="mt-1 text-xs font-semibold text-muted">
-            {note.author_name ?? "Decoralia"} - {timeFormatter.format(createdAt)}
-          </p>
-          {note.files && note.files.length > 0 ? (
-            <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
-              {note.files.map((file) => (
-                <a
-                  key={file.id}
-                  href={file.signed_url ?? "#"}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block overflow-hidden rounded-lg border border-line bg-paper"
-                  title={file.file_name}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={file.signed_url} alt={file.file_name} className="aspect-square w-full object-cover" />
-                </a>
-              ))}
-            </div>
-          ) : null}
-        </div>
-        <div className="flex shrink-0 gap-2">
+              Cancelar
+            </button>
+            <button className="h-10 rounded-lg bg-moss px-4 text-sm font-black text-white" type="submit">
+              Guardar cambios
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            {note.project_id ? (
+              <Link
+                href={`/projects/${note.project_id}`}
+                className="mb-2 inline-flex max-w-full items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-moss"
+              >
+                <FolderKanban size={14} />
+                <span className="truncate">
+                  {note.project_name ?? "Obra vinculada"}
+                  {note.project_client_name ? ` - ${note.project_client_name}` : ""}
+                </span>
+              </Link>
+            ) : null}
+            <p className={`whitespace-pre-wrap text-sm font-bold ${note.is_done ? "line-through decoration-2" : "text-ink"}`}>
+              {note.text}
+            </p>
+            <p className="mt-1 text-xs font-semibold text-muted">
+              {note.author_name ?? "Decoralia"} - {timeFormatter.format(createdAt)}
+            </p>
+            {note.files && note.files.length > 0 ? (
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
+                {note.files.map((file) => (
+                  <a
+                    key={file.id}
+                    href={file.signed_url ?? "#"}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block overflow-hidden rounded-lg border border-line bg-paper"
+                    title={file.file_name}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={file.signed_url} alt={file.file_name} className="aspect-square w-full object-cover" />
+                  </a>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-black text-ink"
+              onClick={() => setIsEditing(true)}
+              type="button"
+            >
+              <Pencil size={16} />
+              Editar
+            </button>
           <form action={toggleDailyNoteAction}>
             <input type="hidden" name="note_id" value={note.id} />
             <input type="hidden" name="note_date" value={selectedDate} />
@@ -294,6 +338,7 @@ function DailyNoteRow({ note, selectedDate }: { note: DailyNote; selectedDate: s
           </form>
         </div>
       </div>
+      )}
     </article>
   );
 }
