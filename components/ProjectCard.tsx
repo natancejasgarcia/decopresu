@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Euro, MapPin, MessageSquareText } from "lucide-react";
+import { CloneProjectButton } from "@/components/CloneProjectButton";
 import { DeleteProjectButton } from "@/components/DeleteProjectButton";
 import { formatCurrency, formatDate } from "@/lib/calculations";
 import type { Project, ProjectStatus } from "@/lib/types";
@@ -79,7 +80,7 @@ export function ProjectCard({ project, budgetTotal = 0, unreadCount = 0 }: Proje
           </span>
         </div>
       </Link>
-      <div className="mt-4 flex items-center justify-between gap-3">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         {unreadCount > 0 ? (
           <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-red-600 px-2 text-sm font-black text-white shadow-soft">
             {unreadCount > 99 ? "99+" : unreadCount}
@@ -87,7 +88,10 @@ export function ProjectCard({ project, budgetTotal = 0, unreadCount = 0 }: Proje
         ) : (
           <span />
         )}
-        <DeleteProjectButton projectId={project.id} projectName={project.name} />
+        <div className="flex items-center gap-2">
+          <CloneProjectButton projectId={project.id} projectName={project.name} compact />
+          <DeleteProjectButton projectId={project.id} projectName={project.name} />
+        </div>
       </div>
     </article>
   );

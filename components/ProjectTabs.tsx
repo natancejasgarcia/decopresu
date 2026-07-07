@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FileText, ImagePlus, MessageCircle, ReceiptText, Ruler, UserRound, WalletCards } from "lucide-react";
 import { BudgetBuilder } from "@/components/BudgetBuilder";
 import { ClientCard } from "@/components/ClientCard";
+import { CloneProjectButton } from "@/components/CloneProjectButton";
 import { FileUploader } from "@/components/FileUploader";
 import { ProjectChat } from "@/components/ProjectChat";
 import { ProjectEditForm } from "@/components/ProjectEditForm";
@@ -82,6 +83,7 @@ export function ProjectTabs({
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-paper px-3 py-1 text-sm font-black text-steel">{project.status}</span>
                 <span className="rounded-full bg-paper px-3 py-1 text-sm font-black text-moss">{project.project_type ?? "Pintura"}</span>
+                <CloneProjectButton projectId={project.id} projectName={project.name} />
                 <button
                   className="h-10 rounded-lg border border-line px-3 text-sm font-black text-ink"
                   onClick={() => setIsEditingProject((current) => !current)}
