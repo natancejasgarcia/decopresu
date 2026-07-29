@@ -80,8 +80,37 @@ function sanitizeFileName(value: string) {
     .slice(0, 70);
 }
 
+function safePdfText(value: string | number | null | undefined, font: PDFFont) {
+  const replacements: Record<string, string> = {
+    "–": "-",
+    "—": "-",
+    "−": "-",
+    "…": "...",
+    "“": '"',
+    "”": '"',
+    "‘": "'",
+    "’": "'",
+    "•": "-",
+  };
+
+  return String(value ?? "")
+    .normalize("NFC")
+    .split("")
+    .map((character) => {
+      const candidate = replacements[character] ?? character;
+
+      try {
+        font.encodeText(candidate);
+        return candidate;
+      } catch {
+        return "?";
+      }
+    })
+    .join("");
+}
+
 function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
-  const paragraphs = String(text || "").split(/\r?\n/);
+  const paragraphs = safePdfText(text, font).split(/\r?\n/);
   const lines: string[] = [];
 
   for (const paragraph of paragraphs) {
@@ -109,7 +138,7 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
 
 function drawLabelValue(page: PDFPage, label: string, value: string, x: number, y: number, fonts: Fonts) {
   page.drawText(label, { x, y, size: 7.5, font: fonts.bold, color: MUTED });
-  page.drawText(value || "-", { x, y: y - 11, size: 9, font: fonts.bold, color: INK });
+  page.drawText(safePdfText(value || "-", fonts.bold), { x, y: y - 11, size: 9, font: fonts.bold, color: INK });
 }
 
 function sectionTitle(page: PDFPage, title: string, y: number, fonts: Fonts) {
@@ -137,7 +166,7 @@ function drawTableHeader(page: PDFPage, y: number, headers: Array<{ label: strin
   return y - 18;
 }
 
-export async function GET(_request: NextRequest, { params }: Context) {
+async function generateBudgetPdf(_request: NextRequest, { params }: Context) {
   const supabase = createServerSupabaseClient();
   const {
     data: { user },
@@ -399,4 +428,16 @@ export async function GET(_request: NextRequest, { params }: Context) {
       "Cache-Control": "no-store",
     },
   });
+}
+
+export async function GET(request: NextRequest, context: Context) {
+  try {
+    return await generateBudgetPdf(request, context);
+  } catch (error) {
+    console.error("[Decoralia PDF] Error generando presupuesto:", error);
+    return NextResponse.json(
+      { error: "No se pudo generar el PDF de este presupuesto. Revisa los conceptos e intentalo de nuevo." },
+      { status: 500 },
+    );
+  }
 }
