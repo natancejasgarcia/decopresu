@@ -7,6 +7,7 @@ import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import type { BudgetItem, Project, Room } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
@@ -187,11 +188,19 @@ export async function GET(_request: NextRequest, { params }: Context) {
   let page = newPage(pdf);
   let y = PAGE_HEIGHT - MARGIN;
 
-  const logoBytes = await readFile(path.join(process.cwd(), "public", "decoralia-logo.png"));
-  const logo = await pdf.embedPng(logoBytes);
-  const logoWidth = 245;
-  const logoHeight = (logo.height / logo.width) * logoWidth;
-  page.drawImage(logo, { x: MARGIN, y: y - logoHeight, width: logoWidth, height: logoHeight });
+  let logoHeight = 0;
+  try {
+    const logoBytes = await readFile(path.join(process.cwd(), "public", "decoralia-logo.png"));
+    const logo = await pdf.embedPng(logoBytes);
+    const logoWidth = 245;
+    logoHeight = (logo.height / logo.width) * logoWidth;
+    page.drawImage(logo, { x: MARGIN, y: y - logoHeight, width: logoWidth, height: logoHeight });
+  } catch (error) {
+    // A missing logo must never prevent a customer budget from being downloaded.
+    console.error("[Decoralia PDF] No se pudo cargar el logo:", error);
+    page.drawText("DECORALIA PINTORES", { x: MARGIN, y: y - 24, size: 18, font: fonts.bold, color: MOSS });
+    logoHeight = 36;
+  }
 
   page.drawText("PRESUPUESTO", { x: PAGE_WIDTH - MARGIN - 155, y: y - 20, size: 20, font: fonts.bold, color: INK });
   drawLabelValue(page, "Nº PRESUPUESTO", budgetNumber(project), PAGE_WIDTH - MARGIN - 155, y - 48, fonts);

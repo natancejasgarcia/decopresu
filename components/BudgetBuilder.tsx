@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Calculator, ChevronDown, ChevronUp, Download, GripVertical, Pencil, ReceiptText, Save, Sparkles, Trash2, X } from "lucide-react";
 import {
@@ -52,6 +51,7 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editIsFixedPrice, setEditIsFixedPrice] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const total = useMemo(() => orderedItems.reduce((sum, item) => sum + Number(item.total), 0), [orderedItems]);
   const roomArea = useMemo(
     () => rooms.reduce((sum, room) => sum + Number(room.total_paintable_area) + getRoomModulesArea(room), 0),
@@ -111,6 +111,40 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
       }
       router.refresh();
     });
+  }
+
+  async function handlePdfDownload() {
+    setFormError(null);
+    setIsDownloadingPdf(true);
+
+    try {
+      const response = await fetch(`/projects/${projectId}/budget/pdf`, {
+        credentials: "same-origin",
+      });
+
+      if (!response.ok) {
+        const detail = await response.json().catch(() => null);
+        throw new Error(detail?.error || "No se pudo preparar el PDF.");
+      }
+
+      const pdf = await response.blob();
+      const filename = response.headers
+        .get("content-disposition")
+        ?.match(/filename="?([^";]+)"?/i)?.[1] || "Presupuesto-Decoralia.pdf";
+      const objectUrl = URL.createObjectURL(pdf);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = filename;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "No se pudo descargar el PDF. Intentalo de nuevo.");
+    } finally {
+      setIsDownloadingPdf(false);
+    }
   }
 
   function handleUpdate(event: FormEvent<HTMLFormElement>, itemId: string) {
@@ -196,10 +230,15 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
             <Sparkles size={17} />
             {isPending ? "Pensando..." : "Hacer con IA"}
           </button>
-          <Link className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line px-3 text-sm font-black text-ink" href={`/projects/${projectId}/budget/pdf`}>
+          <button
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line px-3 text-sm font-black text-ink disabled:opacity-60"
+            disabled={isDownloadingPdf}
+            onClick={handlePdfDownload}
+            type="button"
+          >
             <Download size={17} />
-            Descargar PDF
-          </Link>
+            {isDownloadingPdf ? "Preparando PDF..." : "Descargar PDF"}
+          </button>
         </div>
       </div>
       {formError ? (
