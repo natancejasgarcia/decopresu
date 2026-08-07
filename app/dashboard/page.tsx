@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowRight, BarChart3, FileCheck2, FolderKanban, Mail, NotebookPen, Plus } from "lucide-react";
+import { ArrowRight, BarChart3, CalendarDays, FileCheck2, FolderKanban, Mail, NotebookPen, Plus } from "lucide-react";
+import { ProjectCalendar, type CalendarProject } from "@/components/ProjectCalendar";
 import { TopBar } from "@/components/TopBar";
 import { requireUserProfile } from "@/lib/auth";
 
@@ -26,6 +27,16 @@ export default async function DashboardPage() {
       .eq("is_done", false),
   ]);
 
+  const { data: calendarProjectData, error: calendarProjectsError } = await supabase
+    .from("projects")
+    .select("id,name,client_name,address,status,project_type,created_at")
+    .order("created_at", { ascending: true })
+    .returns<CalendarProject[]>();
+
+  if (calendarProjectsError) {
+    throw new Error(calendarProjectsError.message);
+  }
+
   const validationsUnavailable = isOptionalDashboardError(validationsError);
   const notesUnavailable = isOptionalDashboardError(notesError);
 
@@ -51,6 +62,15 @@ export default async function DashboardPage() {
       badge: `${projectCount ?? 0} obras`,
       tone: "bg-white text-ink",
       iconTone: "bg-emerald-50 text-moss",
+    },
+    {
+      title: "Organizador",
+      detail: "Ver las obras colocadas en un calendario mensual.",
+      href: "#organizador",
+      icon: CalendarDays,
+      badge: "Calendario",
+      tone: "bg-white text-ink",
+      iconTone: "bg-violet-50 text-violet-700",
     },
     {
       title: "Contabilidad",
@@ -131,6 +151,13 @@ export default async function DashboardPage() {
             );
           })}
         </section>
+        <div id="organizador">
+          <ProjectCalendar
+            projects={calendarProjectData ?? []}
+            initialYear={new Date().getFullYear()}
+            initialMonth={new Date().getMonth()}
+          />
+        </div>
       </div>
     </main>
   );
