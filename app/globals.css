@@ -22,7 +22,16 @@ body {
     linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(246, 247, 244, 0.96)),
     #f6f7f4;
   color: #1f2a2b;
+  font-size: 16px;
+  line-height: 1.5;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
 }
+
+a, button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 3px solid #225c50; outline-offset: 3px; }
+button:disabled { cursor: wait; opacity: 0.55; }
+textarea { resize: vertical; }
+@media (min-width: 1024px) { body { padding-bottom: 0; } }
 
 button,
 input,
@@ -33,11 +42,11 @@ select {
 
 @layer components {
   .form-label {
-    @apply mb-1 block text-xs font-black uppercase text-muted;
+    @apply mb-2 block text-sm font-bold text-ink;
   }
 
   .form-input {
-    @apply w-full rounded-lg border border-line bg-white px-3 py-3 text-sm font-semibold text-ink outline-none transition focus:border-moss focus:ring-2 focus:ring-moss/15;
+    @apply min-h-12 w-full rounded-lg border border-line bg-white px-3 py-3 text-base font-medium text-ink outline-none transition focus:border-moss focus:ring-2 focus:ring-moss/15;
   }
 
   .section-panel {
@@ -45,7 +54,7 @@ select {
   }
 
   .section-heading {
-    @apply mb-4 flex items-center justify-between gap-3;
+    @apply mb-4 flex flex-wrap items-center justify-between gap-3;
   }
 
   .section-heading h2 {
@@ -53,13 +62,26 @@ select {
   }
 
   .quick-button {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-paper px-2 text-sm font-black text-ink;
+    @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-paper px-3 text-base font-bold text-ink;
+  }
+  .action-primary {
+    @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-moss px-4 py-3 text-base font-bold text-white transition hover:bg-emerald-900;
+  }
+  .action-secondary {
+    @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 py-3 text-base font-semibold text-ink transition hover:bg-paper;
+  }
+  .feedback-error {
+    @apply rounded-lg border border-red-200 bg-red-50 p-4 text-base font-medium text-red-800;
+  }
+  .feedback-success {
+    @apply rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-base font-medium text-emerald-900;
   }
 }
 
 @media print {
   body {
     background: white;
+    padding-bottom: 0;
   }
 
   .no-print {

@@ -11,6 +11,33 @@
 
 ## Sobre el proyecto
 
+### Gestion comercial: albaranes y facturas
+
+Decoralia incorpora un circuito de ventas inspirado en herramientas de gestion como ClassicGes:
+
+- Inicio con accesos directos y navegacion permanente en movil.
+- Directorio de clientes agrupado a partir de las obras existentes.
+- Creacion de albaranes y facturas desde un presupuesto de obra o desde un documento vacio.
+- Borradores editables con datos fiscales, conceptos, unidades, precios, IVA y observaciones.
+- Emision con numeracion correlativa por serie y ejercicio, asignada mediante una transaccion de PostgreSQL.
+- Conversion de un albaran emitido en factura, evitando duplicar la factura de origen.
+- Datos fiscales del emisor conservados en cada documento emitido.
+- Cobros parciales por factura registrados tambien en Finanzas.
+- Descarga privada de PDFs A4 con logo y paginacion.
+
+**Activacion:** ejecutar `supabase/migrations/20261005_sales_documents.sql` despues del esquema base. A continuacion, completar los datos fiscales en `/settings`. La migracion no borra proyectos, presupuestos ni movimientos existentes. Si aun no esta aplicada, la pantalla de ventas muestra que el modulo esta pendiente de activar.
+
+**Alcance fiscal:** esta version no implementa registros encadenados, remision a la AEAT, QR tributario, declaracion responsable del sistema ni facturas rectificativas. No se presenta como un sistema adaptado a VERI*FACTU. Su utilizacion para facturacion oficial requiere completar y revisar esa integracion.
+
+Verificacion del modulo: `node --test tests/sales.test.cjs`.
+
+Prueba opcional de migraciones y transacciones sobre PostgreSQL embebido, sin conectar con datos reales:
+
+```bash
+npm install --prefix tmp/sales-verification --no-save --package-lock=false @electric-sql/pglite
+node tests/sales-db.cjs
+```
+
 Decoralia Proyectos sustituye la gestion dispersa de obras por WhatsApp, hojas de calculo y documentos sueltos. Centraliza el ciclo completo de una obra en una interfaz responsive pensada para usarse desde movil:
 
 - Proyectos de pintura y lacado, con estados, clientes y actividad.
@@ -51,12 +78,12 @@ El producto esta pensado para un equipo pequeno y prioriza claridad, rapidez y t
 
 Calculos principales:
 
-\`\`\`text
+```text
 Techo = largo x ancho
 Paredes = 2 x (largo + ancho) x alto
 Total pintable = techo + paredes - huecos
 Importe = cantidad x precio unitario
-\`\`\`
+```
 
 ### Comunicacion y archivos
 
@@ -88,7 +115,7 @@ Importe = cantidad x precio unitario
 
 ## Arquitectura
 
-\`\`\`text
+```text
 app/
   dashboard/                 Dashboard operativo
   projects/                  Listado, alta y detalle de proyectos
@@ -108,7 +135,7 @@ supabase/
   migrations/                Cambios incrementales
 public/                      Branding y recursos estaticos
 middleware.ts                Proteccion de rutas y sesion
-\`\`\`
+```
 
 ## Stack tecnico
 
@@ -126,16 +153,16 @@ middleware.ts                Proteccion de rutas y sesion
 
 El esquema incluye:
 
-- \`profiles\`: usuarios autorizados y roles.
-- \`projects\`: obras, clientes, tipo y estado.
-- \`messages\`: chat por proyecto.
-- \`project_files\`: fotos y documentos.
-- \`rooms\` y \`room_modules\`: mediciones y partidas por zona.
-- \`budget_items\`: conceptos ordenables del presupuesto.
-- \`project_expenses\`, \`project_payments\` y \`fixed_costs\`: contabilidad.
-- \`daily_notes\` y \`daily_note_files\`: seguimiento diario.
-- \`budget_validations\`: control de PDFs.
-- \`sent_emails\`: historico de comunicaciones.
+- `profiles`: usuarios autorizados y roles.
+- `projects`: obras, clientes, tipo y estado.
+- `messages`: chat por proyecto.
+- `project_files`: fotos y documentos.
+- `rooms` y `room_modules`: mediciones y partidas por zona.
+- `budget_items`: conceptos ordenables del presupuesto.
+- `project_expenses`, `project_payments` y `fixed_costs`: contabilidad.
+- `daily_notes` y `daily_note_files`: seguimiento diario.
+- `budget_validations`: control de PDFs.
+- `sent_emails`: historico de comunicaciones.
 
 Las tablas sensibles tienen Row Level Security activado. El bucket de archivos es privado y se usan enlaces firmados para la visualizacion temporal.
 
@@ -149,36 +176,36 @@ Las tablas sensibles tienen Row Level Security activado. El bucket de archivos e
 
 ### 1. Clonar e instalar
 
-\`\`\`bash
+```bash
 git clone https://github.com/natancejasgarcia/decopresu.git
 cd decopresu
 npm install
-\`\`\`
+```
 
 ### 2. Configurar Supabase
 
 1. Crea un proyecto en Supabase.
 2. Activa Authentication con email y contrasena.
 3. Crea manualmente los usuarios privados.
-4. Ejecuta \`supabase/schema.sql\` desde el SQL Editor.
-5. En bases existentes, ejecuta las migraciones de \`supabase/migrations/\` en orden cronologico.
-6. Confirma el bucket privado \`project-files\`.
-7. Anade los usuarios a \`public.profiles\` usando sus UUID reales:
+4. Ejecuta `supabase/schema.sql` desde el SQL Editor.
+5. En bases existentes, ejecuta las migraciones de `supabase/migrations/` en orden cronologico.
+6. Confirma el bucket privado `project-files`.
+7. Anade los usuarios a `public.profiles` usando sus UUID reales:
 
-\`\`\`sql
+```sql
 insert into public.profiles (user_id, name, role)
 values
   ('UUID_REAL_DEL_USUARIO', 'Jose Antonio', 'admin'),
   ('UUID_REAL_DEL_USUARIO', 'Padre', 'member');
-\`\`\`
+```
 
-No uses textos como \`UUID_DE_JOSE_ANTONIO\`: la columna espera un UUID real de Supabase Auth.
+No uses textos como `UUID_DE_JOSE_ANTONIO`: la columna espera un UUID real de Supabase Auth.
 
 ### 3. Variables de entorno
 
-Copia \`.env.example\` a \`.env.local\` y configura:
+Copia `.env.example` a `.env.local` y configura:
 
-\`\`\`env
+```env
 NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_publishable_o_anon_key
 SUPABASE_SERVICE_ROLE_KEY=tu_service_role_key
@@ -193,37 +220,37 @@ SMTP_FROM_NAME=Decoralia Pintores
 NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3000
 EMAIL_LOGO_URL=http://127.0.0.1:3000/decoralia-logo.png
 OPENAI_API_KEY=tu_api_key_opcional
-\`\`\`
+```
 
-Las variables \`SUPABASE_SERVICE_ROLE_KEY\`, \`SMTP_PASSWORD\` y \`OPENAI_API_KEY\` son secretos de servidor. No deben llevar el prefijo \`NEXT_PUBLIC_\` ni subirse al repositorio.
+Las variables `SUPABASE_SERVICE_ROLE_KEY`, `SMTP_PASSWORD` y `OPENAI_API_KEY` son secretos de servidor. No deben llevar el prefijo `NEXT_PUBLIC_` ni subirse al repositorio.
 
 ### 4. Ejecutar
 
-\`\`\`bash
+```bash
 npm run dev
-\`\`\`
+```
 
 Abre http://127.0.0.1:3000.
 
 Scripts disponibles:
 
-\`\`\`bash
+```bash
 npm run dev       # Desarrollo local
 npm run build     # Build de produccion
 npm run start     # Servir la build
 npm run lint      # Lint
-\`\`\`
+```
 
 ## Despliegue en Vercel
 
 1. Importa el repositorio desde GitHub.
 2. Configura las variables en Production, Preview y Development.
-3. Verifica que \`NEXT_PUBLIC_SUPABASE_URL\` apunta al proyecto activo e incluye \`https://\`.
-4. Despliega la rama \`main\`.
+3. Verifica que `NEXT_PUBLIC_SUPABASE_URL` apunta al proyecto activo e incluye `https://`.
+4. Despliega la rama `main`.
 5. En Supabase, configura el dominio de produccion en Authentication > URL Configuration.
 6. Comprueba login, dashboard, subida de archivos y descarga de PDF.
 
-Un error \`ENOTFOUND ...supabase.co\` en Vercel indica que la URL configurada no resuelve en DNS o apunta a un proyecto que ya no existe; no es un fallo de compilacion de Next.js.
+Un error `ENOTFOUND ...supabase.co` en Vercel indica que la URL configurada no resuelve en DNS o apunta a un proyecto que ya no existe; no es un fallo de compilacion de Next.js.
 
 ## Seguridad y decisiones tecnicas
 
@@ -239,18 +266,18 @@ Un error \`ENOTFOUND ...supabase.co\` en Vercel indica que la URL configurada no
 
 ### Disponible
 
-Gestion de proyectos, chat, archivos, mediciones, modulos por zona, presupuestos PDF, finanzas, cobros, gastos, costes fijos, notas diarias, calendario, validacion de PDFs, envio de correos y generacion asistida con IA.
+Gestion de proyectos, chat, archivos, mediciones, modulos por zona, presupuestos PDF, albaranes, facturas internas con series, finanzas, cobros parciales, gastos, costes fijos, notas diarias, calendario, validacion de PDFs, envio de correos y generacion asistida con IA.
 
 ### Siguiente evolucion
 
 - PWA instalable y soporte offline parcial.
 - Notificaciones push.
 - Firma digital de aceptacion.
-- Facturacion avanzada y series numeradas.
+- Integracion fiscal y facturas rectificativas.
 - Integracion con WhatsApp.
 - Permisos por rol mas granulares.
 - Auditoria de cambios.
-- Pruebas automatizadas de flujos criticos.
+- Ampliar las pruebas automatizadas a los modulos existentes.
 
 ## Valor como proyecto de portfolio
 

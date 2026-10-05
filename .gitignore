@@ -8,4 +8,6 @@ dist
 node_modules
 .env
 .env.local
+tmp/
+*.tsbuildinfo
 *.log
