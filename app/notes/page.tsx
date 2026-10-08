@@ -4,16 +4,20 @@ import { DailyNotesPanel } from "@/components/DailyNotesPanel";
 import { TopBar } from "@/components/TopBar";
 import { requireUserProfile } from "@/lib/auth";
 import type { DailyNote, DailyNoteFile, Profile, Project } from "@/lib/types";
+import { BriefingPage } from "./BriefingPage";
+import "./briefing.css";
 
 export const dynamic = "force-dynamic";
 
 type NotesPageProps = {
   searchParams?: {
     date?: string;
+    view?: string;
   };
 };
 
 export default async function NotesPage({ searchParams }: NotesPageProps) {
+  if (!searchParams?.date && searchParams?.view !== "history") return <BriefingPage />;
   const { supabase, profile } = await requireUserProfile();
   const selectedDate = getSelectedDate(searchParams?.date);
 
@@ -102,6 +106,10 @@ export default async function NotesPage({ searchParams }: NotesPageProps) {
           <ArrowLeft size={17} />
           Inicio
         </Link>
+        <nav className="briefing-tabs" aria-label="Notas">
+          <Link href="/notes">Pizarra</Link>
+          <Link href="/notes?view=history" aria-current="page">Apuntes por dia</Link>
+        </nav>
         <DailyNotesPanel
           notes={enrichedDailyNotes}
           selectedDate={selectedDate}

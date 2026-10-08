@@ -2,6 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
+    serverActions: { bodySizeLimit: "4mb" },
     outputFileTracingIncludes: {
       "/sales/*/pdf": ["./public/decoralia-logo.png"],
     },

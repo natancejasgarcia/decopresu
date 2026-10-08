@@ -45,7 +45,7 @@ Decoralia Proyectos sustituye la gestion dispersa de obras por WhatsApp, hojas d
 - Mediciones por habitaciones, zonas y modulos.
 - Presupuestos editables, ordenables y descargables en PDF A4.
 - Gastos, cobros, costes fijos y seguimiento financiero.
-- Notas diarias, calendario de obras y validador de presupuestos.
+- Pizarra de briefing compartida, notas diarias, calendario de obras y validador de presupuestos.
 - Envio de correos con identidad visual de Decoralia.
 - Generacion asistida de presupuestos con IA.
 
@@ -125,7 +125,7 @@ app/
   finance/                   Finanzas y movimientos
   emails/                    Composicion e historico de correos
   validations/               Validador de presupuestos PDF
-  notes/                     Notas diarias con fotos y proyectos
+  notes/                     Pizarra compartida e historial de notas
   login/                     Acceso privado
 
 components/                  Componentes de interfaz reutilizables
@@ -189,7 +189,7 @@ npm install
 2. Activa Authentication con email y contrasena.
 3. Crea manualmente los usuarios privados.
 4. Ejecuta `supabase/schema.sql` desde el SQL Editor.
-5. En bases existentes, ejecuta las migraciones de `supabase/migrations/` en orden cronologico.
+5. Ejecuta tambien las migraciones de `supabase/migrations/` en orden cronologico, tanto en bases nuevas como existentes.
 6. Confirma el bucket privado `project-files`.
 7. Anade los usuarios a `public.profiles` usando sus UUID reales:
 
@@ -243,6 +243,23 @@ npm run lint      # Lint
 ```
 
 ## Despliegue en Vercel
+
+### Activar la pizarra compartida
+
+Ejecuta `supabase/migrations/20261008_briefing_board.sql` una vez en el SQL Editor del proyecto Supabase existente. Es una migracion aditiva e idempotente: no borra ni modifica notas, proyectos, presupuestos o costes. Despues, recarga `/notes`.
+
+- `/notes`: lienzo permanente con dibujo, flechas, textos, fotos y tarjetas de presupuestos enlazadas a la obra y su PDF. Los importes de las tarjetas son una instantanea al anadirlas; editar un texto de la pizarra no cambia el presupuesto real.
+- `/notes?view=history` y los enlaces antiguos `/notes?date=...`: apuntes diarios originales, con fotos, edicion y archivo, sin perdida de historial.
+- Guardado automatico autenticado, lectura de cambios cada 12 segundos y control de versiones en PostgreSQL. Las ediciones concurrentes se reconcilian con Excalidraw; los elementos borrados se conservan como tombstones para evitar resurrecciones accidentales.
+- Las fotos se comprimen antes de guardar en la escena privada (limite de 3,5 MB por escena). Se puede exportar una copia `.excalidraw` o una imagen. Los borradores no guardados intentan recuperarse en el mismo navegador y usuario; no sustituyen a una copia de seguridad.
+- Sin migracion, la interfaz avisa expresamente que el guardado compartido no esta activo; permite probar y descargar la pizarra, sin fingir un guardado en servidor.
+- `predev` y `prebuild` preparan las fuentes de Excalidraw dentro de `public/excalidraw-assets`; no se depende de un CDN de fuentes.
+
+El motor de dibujo es Excalidraw (MIT), cargado solo en el navegador. La auditoria de dependencias sigue mostrando avisos en el framework existente y algunas dependencias transitivas; actualizar Next.js y validar esa migracion requiere una revision separada. No se ha aplicado `npm audit fix --force` ni cambiado el sistema de autenticacion para esta funcionalidad.
+
+Pruebas: `node --test tests/briefing.test.cjs` y `node tests/briefing-db.cjs` (esta ultima requiere PGlite en el entorno de verificacion, como `tests/sales-db.cjs`).
+
+### Publicar
 
 1. Importa el repositorio desde GitHub.
 2. Configura las variables en Production, Preview y Development.

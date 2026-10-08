@@ -101,10 +101,10 @@ export default async function DashboardPage() {
     },
     {
       href: "/notes",
-      title: "Apuntes",
+      title: "Notas",
       icon: NotebookPen,
       tone: "bg-white text-ink",
-      detail: `${noteCount ?? 0} pendientes hoy`,
+      detail: `Pizarra · ${noteCount ?? 0} apuntes hoy`,
     },
     {
       href: "/emails",

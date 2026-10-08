@@ -1,0 +1,205 @@
+.briefing-page {
+  height: calc(100dvh - 72px - env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+.briefing-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #dce3e0;
+  background: white;
+  flex-shrink: 0;
+}
+.briefing-tabs a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 15px;
+}
+.briefing-tabs a[aria-current] {
+  background: #e9f4ef;
+  color: #225c50;
+}
+.briefing-workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.briefing-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #dce3e0;
+}
+.briefing-toolbar button,
+.briefing-dialog-heading button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #dce3e0;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 15px;
+  font-weight: 700;
+}
+.briefing-toolbar button:hover {
+  background: #f1f5f3;
+}
+.briefing-toolbar .briefing-primary {
+  color: white;
+  background: #225c50;
+  border-color: #225c50;
+}
+.briefing-toolbar .briefing-primary:hover {
+  background: #19483f;
+}
+.briefing-toolbar .briefing-save {
+  margin-left: auto;
+  border: none;
+  background: #edf9f3;
+  color: #177449;
+  font-size: 13px;
+}
+.briefing-toolbar .briefing-error {
+  background: #fff1f2;
+  color: #b42333;
+}
+.briefing-toolbar .briefing-dirty {
+  background: #fff7db;
+  color: #866000;
+}
+.briefing-canvas {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.briefing-canvas .excalidraw.excalidraw {
+  --color-primary: #225c50;
+  --color-primary-darker: #19483f;
+  --color-primary-light: #e9f4ef;
+  --color-primary-light-darker: #cce3d8;
+}
+.briefing-loading {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  min-height: 400px;
+}
+.briefing-context {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid #dce3e0;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 3px 16px #0002;
+  max-width: calc(100% - 24px);
+}
+.briefing-context a {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  color: #225c50;
+}
+.briefing-warning,
+.briefing-error {
+  padding: 8px 14px;
+  font-size: 14px;
+  background: #fff8df;
+  color: #805b12;
+  border-bottom: 1px solid #efda95;
+}
+.briefing-error {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  background: #fff1f2;
+  color: #b42333;
+  border-color: #f4bfc5;
+}
+.briefing-dialog {
+  width: min(480px, calc(100% - 24px));
+  max-height: 90dvh;
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid #dce3e0;
+  border-radius: 8px;
+  color: #1f2a2b;
+  box-shadow: 0 10px 50px #0003;
+}
+.briefing-dialog::backdrop {
+  background: #172c2b66;
+}
+.briefing-dialog-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.briefing-dialog-heading h2 {
+  font-size: 21px;
+  font-weight: 800;
+}
+@media (min-width: 1024px) {
+  .briefing-page {
+    height: 100dvh;
+  }
+}
+@media (max-width: 600px) {
+  .briefing-tabs {
+    padding: 4px 8px;
+  }
+  .briefing-tabs a {
+    font-size: 14px;
+    padding: 0 8px;
+  }
+  .briefing-toolbar {
+    padding: 6px 8px;
+    gap: 4px;
+  }
+  .briefing-toolbar button {
+    padding: 6px 9px;
+  }
+  .briefing-toolbar .briefing-save {
+    position: absolute;
+    right: 8px;
+    bottom: 10px;
+    z-index: 5;
+    min-height: 36px;
+  }
+  .briefing-warning {
+    max-height: 76px;
+    overflow: auto;
+    font-size: 12px;
+  }
+  .briefing-dialog {
+    padding: 18px;
+  }
+}
