@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { ProjectTabs } from "@/components/ProjectTabs";
 import { sortBudgetItems } from "@/lib/budget";
+import { buildBudgetConceptCatalog, type BudgetConceptSuggestion } from "@/lib/budgetConcepts";
 import { formatCurrency } from "@/lib/calculations";
 import { requireUserProfile } from "@/lib/auth";
 import type { BudgetItem, Message, Profile, Project, ProjectExpense, ProjectFile, ProjectPayment, Room, RoomModule } from "@/lib/types";
@@ -34,6 +35,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     { data: roomData },
     { data: roomModuleData, error: roomModuleError },
     { data: budgetData },
+    { data: conceptData, error: conceptError },
     { data: profileData },
     { data: expenseData, error: expenseError },
     { data: paymentData, error: paymentError },
@@ -43,6 +45,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     supabase.from("rooms").select("*").eq("project_id", params.id).order("created_at", { ascending: false }).returns<Room[]>(),
     supabase.from("room_modules").select("*").eq("project_id", params.id).order("created_at", { ascending: true }).returns<RoomModule[]>(),
     supabase.from("budget_items").select("*").eq("project_id", params.id).order("created_at", { ascending: true }).returns<BudgetItem[]>(),
+    supabase.from("budget_items").select("concept,notes").not("notes", "is", null).neq("notes", "").order("created_at", { ascending: false }).limit(500).returns<BudgetConceptSuggestion[]>(),
     supabase.from("profiles").select("*").returns<Profile[]>(),
     supabase.from("project_expenses").select("*").eq("project_id", params.id).order("expense_date", { ascending: false }).returns<ProjectExpense[]>(),
     supabase.from("project_payments").select("*").eq("project_id", params.id).order("payment_date", { ascending: false }).returns<ProjectPayment[]>(),
@@ -60,6 +63,8 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     modules: modulesByRoom.get(room.id) ?? [],
   }));
   const budgetItems = sortBudgetItems(budgetData ?? []);
+  if (conceptError) console.error("[Decoralia budget concepts]", conceptError.code);
+  const budgetConceptSuggestions = buildBudgetConceptCatalog(conceptData ?? []);
   const expenses = expenseError?.code === "42P01" ? [] : (expenseData ?? []);
   const payments = paymentError?.code === "42P01" ? [] : (paymentData ?? []);
   const profiles = profileData ?? [];
@@ -126,6 +131,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           files={filesWithSignedUrls}
           rooms={rooms}
           budgetItems={budgetItems}
+          budgetConceptSuggestions={budgetConceptSuggestions}
           expenses={expensesWithSignedReceipts}
           payments={paymentsWithSignedReceipts}
         />

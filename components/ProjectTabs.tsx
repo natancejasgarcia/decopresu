@@ -20,6 +20,7 @@ import { ProjectEditForm } from "@/components/ProjectEditForm";
 import { ProjectFinancePanel } from "@/components/ProjectFinancePanel";
 import { RoomCalculator } from "@/components/RoomCalculator";
 import { formatCurrency } from "@/lib/calculations";
+import type { BudgetConceptSuggestion } from "@/lib/budgetConcepts";
 import type {
   BudgetItem,
   Message,
@@ -38,6 +39,7 @@ type ProjectTabsProps = {
   files: ProjectFile[];
   rooms: Room[];
   budgetItems: BudgetItem[];
+  budgetConceptSuggestions?: BudgetConceptSuggestion[];
   expenses: ProjectExpense[];
   payments: ProjectPayment[];
 };
@@ -70,6 +72,7 @@ export function ProjectTabs({
   files,
   rooms,
   budgetItems,
+  budgetConceptSuggestions,
   expenses,
   payments,
 }: ProjectTabsProps) {
@@ -255,6 +258,7 @@ export function ProjectTabs({
           <BudgetBuilder
             projectId={project.id}
             items={budgetItems}
+            conceptSuggestions={budgetConceptSuggestions}
             rooms={rooms}
           />
         ) : null}

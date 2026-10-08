@@ -12,6 +12,8 @@ import {
   updateBudgetItemAction,
 } from "@/actions/budgetActions";
 import { sortBudgetItems } from "@/lib/budget";
+import { BudgetConceptFields } from "@/components/BudgetConceptFields";
+import { buildBudgetConceptCatalog, type BudgetConceptSuggestion } from "@/lib/budgetConcepts";
 import { formatCurrency } from "@/lib/calculations";
 import type { BudgetItem, Room } from "@/lib/types";
 
@@ -19,18 +21,8 @@ type BudgetBuilderProps = {
   projectId: string;
   items: BudgetItem[];
   rooms: Room[];
+  conceptSuggestions?: BudgetConceptSuggestion[];
 };
-
-const CONCEPTS = [
-  "Pintura paredes",
-  "Pintura techos",
-  "Esmalte",
-  "Lacado de puertas",
-  "Reparaciones",
-  "Materiales",
-  "Mano de obra",
-  "Otros",
-];
 
 function getRoomModulesTotal(room: Room) {
   return (room.modules ?? []).reduce((sum, module) => sum + Number(module.total), 0);
@@ -42,7 +34,7 @@ function getRoomModulesArea(room: Room) {
     .reduce((sum, module) => sum + Number(module.quantity), 0);
 }
 
-export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
+export function BudgetBuilder({ projectId, items, rooms, conceptSuggestions = [] }: BudgetBuilderProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isFixedPrice, setIsFixedPrice] = useState(false);
@@ -52,6 +44,11 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
   const [editIsFixedPrice, setEditIsFixedPrice] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [newConceptKey, setNewConceptKey] = useState(0);
+  const conceptCatalog = useMemo(() => buildBudgetConceptCatalog([
+    ...[...orderedItems].reverse().map((item) => ({ concept: item.concept, notes: item.notes ?? "" })),
+    ...conceptSuggestions,
+  ]), [orderedItems, conceptSuggestions]);
   const total = useMemo(() => orderedItems.reduce((sum, item) => sum + Number(item.total), 0), [orderedItems]);
   const roomArea = useMemo(
     () => rooms.reduce((sum, room) => sum + Number(room.total_paintable_area) + getRoomModulesArea(room), 0),
@@ -81,6 +78,7 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
         setOrderedItems((currentItems) => sortBudgetItems([...currentItems, result.item]));
       }
       form.reset();
+      setNewConceptKey((key) => key + 1);
       setIsFixedPrice(false);
       router.refresh();
     });
@@ -267,26 +265,7 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
 
       <form onSubmit={handleSubmit} className="grid gap-3 rounded-lg bg-paper p-3">
         <input type="hidden" name="project_id" value={projectId} />
-        <div>
-          <label className="form-label" htmlFor="concept">Concepto</label>
-          <input
-            className="form-input"
-            id="concept"
-            name="concept"
-            list="budget-concepts"
-            placeholder="Pintura paredes, materiales, mano de obra..."
-            required
-          />
-          <datalist id="budget-concepts">
-            {CONCEPTS.map((concept) => (
-              <option key={concept} value={concept} />
-            ))}
-          </datalist>
-        </div>
-        <div>
-          <label className="form-label" htmlFor="notes">Notas del concepto</label>
-          <textarea className="form-input min-h-20" id="notes" name="notes" placeholder="Detalle del trabajo, acabado, materiales o condiciones..." />
-        </div>
+        <BudgetConceptFields key={newConceptKey} id="concept" catalog={conceptCatalog} />
 
         <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-line bg-white px-3 text-sm font-black text-ink">
           <input
@@ -356,21 +335,7 @@ export function BudgetBuilder({ projectId, items, rooms }: BudgetBuilderProps) {
                 {isEditing ? (
                   <form onSubmit={(event) => handleUpdate(event, item.id)} className="grid gap-3">
                     <input type="hidden" name="project_id" value={projectId} />
-                    <div>
-                      <label className="form-label" htmlFor={`concept-${item.id}`}>Concepto</label>
-                      <input
-                        className="form-input"
-                        id={`concept-${item.id}`}
-                        name="concept"
-                        list="budget-concepts"
-                        defaultValue={item.concept}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label" htmlFor={`notes-${item.id}`}>Notas del concepto</label>
-                      <textarea className="form-input min-h-20" id={`notes-${item.id}`} name="notes" defaultValue={item.notes ?? ""} />
-                    </div>
+                    <BudgetConceptFields id={`concept-${item.id}`} catalog={conceptCatalog} initialConcept={item.concept} initialNotes={item.notes ?? ""} />
                     <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-line bg-paper px-3 text-sm font-black text-ink">
                       <input
                         className="h-4 w-4 accent-moss"

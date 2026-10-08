@@ -65,6 +65,7 @@ El producto esta pensado para un equipo pequeno y prioriza claridad, rapidez y t
 ### Presupuestos y mediciones
 
 - Conceptos libres con notas, cantidad, unidad y precio.
+- Autocompletado de conceptos con descripcion editable, basado en trabajos habituales y los ultimos presupuestos del equipo.
 - Conceptos de precio cerrado sin cantidad ni unidad.
 - Edicion, borrado y drag and drop de lineas.
 - Medicion de techo, paredes, huecos y superficie manual.
