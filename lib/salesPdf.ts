@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { safePdfText } from "@/lib/pdfText";
 import {
   displayDay,
   roundAmount,
@@ -30,20 +31,7 @@ export async function generateSalesPdf(
   let page = pdf.addPage([width, height]);
   let y = height - margin;
   function safe(value: string) {
-    return [
-      ...value
-        .replace(/\t/g, " ")
-        .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ""),
-    ]
-      .map((char) => {
-        try {
-          regular.encodeText(char);
-          return char;
-        } catch {
-          return " ";
-        }
-      })
-      .join("");
+    return safePdfText(value, regular);
   }
   function wrapped(value: string, maxWidth: number, size = 10, isBold = false) {
     const font = isBold ? bold : regular;

@@ -3,6 +3,7 @@ import path from "node:path";
 import { NextResponse, type NextRequest } from "next/server";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { sortBudgetItems } from "@/lib/budget";
+import { safePdfText } from "@/lib/pdfText";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import type { BudgetItem, Project, Room } from "@/lib/types";
 
@@ -78,35 +79,6 @@ function sanitizeFileName(value: string) {
     .replace(/[^a-zA-Z0-9_-]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 70);
-}
-
-function safePdfText(value: string | number | null | undefined, font: PDFFont) {
-  const replacements: Record<string, string> = {
-    "–": "-",
-    "—": "-",
-    "−": "-",
-    "…": "...",
-    "“": '"',
-    "”": '"',
-    "‘": "'",
-    "’": "'",
-    "•": "-",
-  };
-
-  return String(value ?? "")
-    .normalize("NFC")
-    .split("")
-    .map((character) => {
-      const candidate = replacements[character] ?? character;
-
-      try {
-        font.encodeText(candidate);
-        return candidate;
-      } catch {
-        return "?";
-      }
-    })
-    .join("");
 }
 
 function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
