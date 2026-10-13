@@ -3,7 +3,8 @@
 import { FormEvent, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CreditCard, Pencil, ReceiptText, Save, Trash2, X } from "lucide-react";
-import { createExpenseAction, createPaymentAction, deleteExpenseAction, deletePaymentAction, updatePaymentAction } from "@/actions/financeActions";
+import { createPaymentAction, deleteExpenseAction, deletePaymentAction, updatePaymentAction } from "@/actions/financeActions";
+import { ExpenseForm } from "@/components/ExpenseForm";
 import { formatCurrency } from "@/lib/calculations";
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS, type ExpenseCategory, type PaymentMethod, type ProjectExpense, type ProjectPayment } from "@/lib/types";
 
@@ -27,23 +28,6 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
   const paymentTotal = useMemo(() => payments.reduce((sum, payment) => sum + Number(payment.amount), 0), [payments]);
   const profit = budgetTotal - expenseTotal;
   const pendingCollection = Math.max(budgetTotal - paymentTotal, 0);
-
-  function submitExpense(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    setErrorMessage(null);
-
-    startTransition(async () => {
-      try {
-        await createExpenseAction(formData);
-        form.reset();
-        router.refresh();
-      } catch (error) {
-        setErrorMessage(getActionErrorMessage(error));
-      }
-    });
-  }
 
   function submitPayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -141,7 +125,7 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
       </div>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <form onSubmit={submitExpense} encType="multipart/form-data" className="grid gap-3 rounded-lg bg-paper p-3">
+        <ExpenseForm className="grid gap-3 rounded-lg bg-paper p-3">
           <input type="hidden" name="project_id" value={projectId} />
           <div className="flex items-center gap-2">
             <ReceiptText size={18} className="text-moss" />
@@ -183,7 +167,7 @@ export function ProjectFinancePanel({ projectId, budgetTotal, expenses, payments
             <input className="form-input file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-black file:text-white" id="expense-receipt" name="receipt" type="file" accept="image/*,application/pdf,.pdf" />
           </div>
           <button className="h-11 rounded-lg bg-moss font-black text-white disabled:opacity-60" disabled={isPending}>Guardar gasto</button>
-        </form>
+        </ExpenseForm>
 
         <form onSubmit={submitPayment} encType="multipart/form-data" className="grid gap-3 rounded-lg bg-paper p-3">
           <input type="hidden" name="project_id" value={projectId} />

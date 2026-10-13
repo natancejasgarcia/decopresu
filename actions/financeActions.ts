@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUserProfile } from "@/lib/auth";
 import { EXPENSE_CATEGORIES, FIXED_COST_FREQUENCIES, PAYMENT_METHODS } from "@/lib/types";
+import { expenseReceiptMetadata, MAX_EXPENSE_RECEIPT_SIZE, uploadedExpenseReceiptSchema, validateExpenseReceiptPath } from "@/lib/expenseReceipts";
 
 const MAX_RECEIPT_FILE_SIZE = 10 * 1024 * 1024;
 const optionalUuid = z.preprocess((value) => (value === "" || value === null ? null : value), z.string().uuid().nullable());
@@ -46,35 +47,75 @@ type FinanceActionResult = {
   error?: string;
 };
 
-export async function createExpenseAction(formData: FormData) {
+export async function createExpenseAction(formData: FormData): Promise<FinanceActionResult> {
   const { supabase, user } = await requireUserProfile();
   const parsed = expenseSchema.safeParse({
     ...Object.fromEntries(formData),
     expense_date: formData.get("expense_date") || currentDateValue(),
   });
 
-  if (!parsed.success) return;
+  if (!parsed.success) return actionError("Revisa el concepto, importe y fecha del gasto.");
+  const expenseId = z.string().uuid().safeParse(formData.get("expense_id") ?? crypto.randomUUID());
+  if (!expenseId.success) return actionError("El identificador del gasto no es valido.");
+  try {
+    let uploaded = null;
+    const metadata = formData.get("uploaded_receipt");
+    if (metadata) {
+      const receipt = uploadedExpenseReceiptSchema.safeParse(JSON.parse(String(metadata)));
+      if (!receipt.success || !validateExpenseReceiptPath(receipt.data, parsed.data.project_id, user.id, expenseId.data)) {
+        return actionError("El justificante no pertenece a este gasto. Vuelve a seleccionar el archivo.");
+      }
+      uploaded = receipt.data;
+    }
+    const matches = (row: Record<string, unknown>) => row.created_by === user.id
+      && Object.entries(parsed.data).every(([key, value]) => key === "amount" ? Number(row[key]) === value : row[key] === value)
+      && (row.receipt_file_url ?? null) === (uploaded?.path ?? null);
+    const existing = await supabase.from("project_expenses").select("*").eq("id", expenseId.data).maybeSingle<Record<string, unknown>>();
+    if (existing.error) return actionError(friendlyFinanceError(existing.error.message));
+    if (existing.data) {
+      if (!matches(existing.data)) return actionError("Este gasto ya se guardo con otros datos. Comprueba la lista antes de volver a registrarlo.");
+      revalidatePath("/finance");
+      if (parsed.data.project_id) revalidatePath(`/projects/${parsed.data.project_id}`);
+      return { ok: true };
+    }
 
-  const { data: expense, error } = await supabase.from("project_expenses").insert({
-    ...parsed.data,
-    created_by: user.id,
-  }).select("id, project_id").single<{ id: string; project_id: string | null }>();
+    let receiptData: { receipt_file_name: string; receipt_file_url: string; receipt_file_type: string } | null = null;
+    if (uploaded) {
+      const { data: stored, error } = await supabase.storage.from("project-files").info(uploaded.path);
+      const size = Number(stored?.size ?? stored?.metadata?.size);
+      const type = stored?.contentType ?? stored?.metadata?.mimetype;
+      if (error || !stored || size !== uploaded.size || size > MAX_EXPENSE_RECEIPT_SIZE || type !== uploaded.type) {
+        return actionError("No se pudo comprobar la foto o PDF subido. El gasto no se ha registrado; vuelve a intentarlo.");
+      }
+      receiptData = { receipt_file_name: uploaded.name, receipt_file_url: uploaded.path, receipt_file_type: uploaded.type };
+    } else {
+      const file = formData.get("receipt");
+      if (isUploadedFile(file)) expenseReceiptMetadata(file);
+      const receipt = await uploadFinanceReceipt(supabase, parsed.data.project_id, file);
+      if (!receipt.ok) return actionError(receipt.error ?? "No se pudo subir el justificante.");
+      receiptData = receipt.data ?? null;
+    }
 
-  if (error) throw new Error(error.message);
-
-  const receiptResult = await attachFinanceReceipt(supabase, "project_expenses", expense.id, parsed.data.project_id, formData.get("receipt"));
-
-  if (!receiptResult.ok) {
-    throw new Error(`El gasto se guardo, pero el adjunto no: ${receiptResult.error}`);
+    // The amount and the verified attachment are inserted together, never in two writes.
+    const { error } = await supabase.from("project_expenses").insert({ id: expenseId.data, ...parsed.data, ...receiptData, created_by: user.id });
+    if (error) {
+      if (error.code === "23505") {
+        const retry = await supabase.from("project_expenses").select("*").eq("id", expenseId.data).maybeSingle<Record<string, unknown>>();
+        if (retry.data && matches(retry.data)) return { ok: true };
+      }
+      return actionError(friendlyFinanceError(error.message));
+    }
+    if (parsed.data.project_id) {
+      await touchProject(supabase, parsed.data.project_id);
+      revalidatePath(`/projects/${parsed.data.project_id}`);
+    }
+    revalidatePath("/dashboard");
+    revalidatePath("/finance");
+    return { ok: true };
+  } catch (error) {
+    console.error("[finance-expense] No se pudo completar el guardado:", error instanceof Error ? error.message : "Error desconocido");
+    return actionError("No se pudo guardar el gasto con su justificante. Conserva los datos y vuelve a intentarlo.");
   }
-
-  if (parsed.data.project_id) {
-    await touchProject(supabase, parsed.data.project_id);
-    revalidatePath(`/projects/${parsed.data.project_id}`);
-  }
-
-  revalidatePath("/dashboard");
-  revalidatePath("/finance");
 }
 
 export async function deleteExpenseAction(formData: FormData) {

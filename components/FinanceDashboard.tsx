@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BarChart3, Banknote, CreditCard, Euro, ReceiptText, Trash2, TrendingDown, TrendingUp, WalletCards } from "lucide-react";
-import { createExpenseAction, createFixedCostAction, createPaymentFormAction, deleteExpenseAction, deleteFixedCostAction, deletePaymentAction } from "@/actions/financeActions";
+import { createFixedCostAction, createPaymentFormAction, deleteExpenseAction, deleteFixedCostAction, deletePaymentAction } from "@/actions/financeActions";
+import { ExpenseForm } from "@/components/ExpenseForm";
 import { formatCurrency } from "@/lib/calculations";
 import { buildDailyFinanceSeries, buildMonthlyFinance, monthLabel, monthlyFixedCostAmount } from "@/lib/finance";
 import {
@@ -103,7 +104,7 @@ export function FinanceDashboard({ projects, budgetItems, expenses, payments, fi
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="grid gap-4">
           <FinanceFormPanel title="Anadir gasto o material" icon={<ReceiptText size={18} />}>
-            <form action={createExpenseAction} encType="multipart/form-data" className="grid gap-3">
+            <ExpenseForm className="grid gap-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Concepto">
                   <input className="form-input" name="concept" placeholder="Pintura, lijas, gasolina..." required />
@@ -142,7 +143,7 @@ export function FinanceDashboard({ projects, budgetItems, expenses, payments, fi
                 <input className="form-input file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-black file:text-white" name="receipt" type="file" accept="image/*,application/pdf,.pdf" />
               </Field>
               <button className="h-11 rounded-lg bg-moss font-black text-white">Guardar gasto</button>
-            </form>
+            </ExpenseForm>
           </FinanceFormPanel>
 
           <FinanceFormPanel title="Registrar cobro" icon={<CreditCard size={18} />}>

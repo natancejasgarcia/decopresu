@@ -272,6 +272,14 @@ Un error `ENOTFOUND ...supabase.co` en Vercel indica que la URL configurada no r
 
 ## Seguridad y decisiones tecnicas
 
+### Justificantes de gastos
+
+Los formularios de Finanzas y de cada obra suben fotos/PDF directamente al bucket privado `project-files` mediante una autorizacion temporal. La Server Action recibe solo los datos del gasto y la referencia del adjunto, evitando el limite de cuerpo de peticion para fotos de hasta 10 MB. Se comprueba el archivo en Storage antes de insertar importe y justificante juntos; el identificador estable del intento evita duplicados al reintentar.
+
+Si falta `receipt_file_name`, `receipt_file_url` o `receipt_file_type` en `project_expenses`, ejecuta `supabase/migrations/20260601_expense_receipts.sql` en el SQL Editor de Supabase. La preparacion de la subida detecta ese caso antes de registrar gastos o subir archivos, y muestra un error recuperable en el formulario. No se necesita una migracion nueva para esta correccion.
+
+Pruebas de regresion: `node --test tests/expense-receipts.test.cjs` (sin escribir datos reales).
+
 - No existe registro publico.
 - Las rutas privadas pasan por middleware y validacion de sesion.
 - Las mutaciones se ejecutan en servidor y revalidan las rutas afectadas.
