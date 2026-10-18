@@ -22,7 +22,7 @@ export function TopBar({ profile }: TopBarProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <MainNavigation />
+            <MainNavigation reviewer={profile.access_role === "reviewer"} />
             <form action={signOutAction}>
               <button className="inline-flex min-h-12 items-center gap-2 rounded-lg border border-line px-3 text-base font-bold text-ink">
                 <LogOut size={17} />
@@ -32,7 +32,7 @@ export function TopBar({ profile }: TopBarProps) {
           </div>
         </div>
       </header>
-      <MainNavigation mobile />
+      <MainNavigation mobile reviewer={profile.access_role === "reviewer"} />
     </>
   );
 }

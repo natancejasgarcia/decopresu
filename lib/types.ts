@@ -24,6 +24,8 @@ export type RoomPaintScope = "walls_and_ceiling" | "ceiling_only" | "walls_only"
 export type RoomModuleType = "ceiling_only" | "walls_only" | "manual_area" | "free";
 
 export type Profile = {
+  access_role?: import("./access").AccessRole;
+  permissions_ready?: boolean;
   id: string;
   user_id: string;
   name: string;

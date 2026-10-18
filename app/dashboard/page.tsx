@@ -14,13 +14,22 @@ import {
   WalletCards,
 } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
+import { ReviewerDashboard } from "@/components/ReviewerDashboard";
 import { requireUserProfile } from "@/lib/auth";
 import { todayMadrid, salesUnavailable } from "@/lib/sales";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const { supabase, profile } = await requireUserProfile();
+  const { supabase, profile } = await requireUserProfile("dashboard");
+  if (profile.access_role === "reviewer") {
+    return (
+      <main className="min-h-screen pb-24">
+        <TopBar profile={profile} />
+        <ReviewerDashboard />
+      </main>
+    );
+  }
   const [
     { count: projectCount, error: projectError },
     { count: noteCount, error: noteError },
@@ -36,7 +45,7 @@ export default async function DashboardPage() {
     supabase
       .from("budget_validations")
       .select("id", { count: "exact", head: true })
-      .or("is_validated.eq.false,validation_notes.not.is.null"),
+      .eq("is_validated", false),
     supabase
       .from("sales_documents")
       .select("id", { count: "exact", head: true })

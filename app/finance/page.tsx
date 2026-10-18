@@ -6,6 +6,7 @@ import { parseMonthKey } from "@/lib/finance";
 import type { BudgetItem, FixedCost, Project, ProjectExpense, ProjectPayment } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 type FinancePageProps = {
   searchParams: {

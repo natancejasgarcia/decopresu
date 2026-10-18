@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BarChart3, Banknote, CreditCard, Euro, ReceiptText, Trash2, TrendingDown, TrendingUp, WalletCards } from "lucide-react";
 import { createFixedCostAction, createPaymentFormAction, deleteExpenseAction, deleteFixedCostAction, deletePaymentAction } from "@/actions/financeActions";
 import { ExpenseForm } from "@/components/ExpenseForm";
+import { FinanceAssistant } from "@/components/FinanceAssistant";
 import { formatCurrency } from "@/lib/calculations";
 import { buildDailyFinanceSeries, buildMonthlyFinance, monthLabel, monthlyFixedCostAmount } from "@/lib/finance";
 import {
@@ -68,6 +69,8 @@ export function FinanceDashboard({ projects, budgetItems, expenses, payments, fi
         </div>
       </section>
 
+      <div className="flex flex-wrap items-center gap-3"><Link href="/finance/scan" className="inline-flex min-h-12 items-center gap-2 rounded-lg bg-moss px-5 font-bold text-white"><ReceiptText size={20} />Escanear facturas</Link></div>
+      <FinanceAssistant />
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={<Euro size={20} />} label="Cobrado este mes" value={formatCurrency(finance.collectedAmount)} detail={`${finance.monthPayments.length} cobros`} tone="green" />
         <StatCard icon={<ReceiptText size={20} />} label="Gastos de obras" value={formatCurrency(finance.expenseAmount)} detail={`${finance.monthExpenses.length} gastos`} tone="red" />

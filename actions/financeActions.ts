@@ -133,7 +133,7 @@ export async function deleteExpenseAction(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
-  if (expense?.receipt_file_url) {
+  if (expense?.receipt_file_url && !expense.receipt_file_url.startsWith("finance-scans/")) {
     await supabase.storage.from("project-files").remove([expense.receipt_file_url]);
   }
 
@@ -240,7 +240,7 @@ export async function deletePaymentAction(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
-  if (payment?.receipt_file_url) {
+  if (payment?.receipt_file_url && !payment.receipt_file_url.startsWith("finance-scans/")) {
     await supabase.storage.from("project-files").remove([payment.receipt_file_url]);
   }
 

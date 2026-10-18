@@ -1,199 +1,114 @@
 "use server";
-
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUserProfile } from "@/lib/auth";
+import { verifiedUpload, uploadMetadataSchema } from "@/lib/privateUploads";
 
-const MAX_VALIDATION_FILE_SIZE = 15 * 1024 * 1024;
-
-const createValidationSchema = z.object({
-  project_id: z.string().uuid(),
-});
-
-export async function createBudgetValidationAction(formData: FormData) {
+export async function saveValidationPdf(input: unknown) {
   const { supabase, user } = await requireUserProfile();
-  const parsed = createValidationSchema.safeParse(Object.fromEntries(formData));
-  const file = formData.get("file");
-
-  if (!parsed.success) return;
-  if (!isUploadedFile(file)) return;
-  if (file.size > MAX_VALIDATION_FILE_SIZE) return;
-  if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) return;
-
-  const { data: project, error: projectError } = await supabase
+  const parsed = uploadMetadataSchema
+    .extend({
+      project_id: z.string().uuid(),
+      validation_id: z.string().uuid().nullable(),
+    })
+    .safeParse(input);
+  if (!parsed.success) return { error: "Revisa la obra y el PDF." };
+  const value = parsed.data;
+  if (
+    value.type !== "application/pdf" ||
+    !(await verifiedUpload(supabase, user.id, "validations", value))
+  )
+    return { error: "No se pudo comprobar el PDF subido." };
+  const project = await supabase
     .from("projects")
     .select("name")
-    .eq("id", parsed.data.project_id)
-    .single<{ name: string }>();
-
-  if (projectError || !project) {
-    console.error("[budget-validation-project]", projectError?.message ?? "Proyecto no encontrado");
-    return;
-  }
-
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-  const path = `${parsed.data.project_id}/budget-validations/${crypto.randomUUID()}-${safeName}`;
-  const { error: uploadError } = await supabase.storage.from("project-files").upload(path, file, {
-    contentType: file.type || "application/pdf",
-    upsert: false,
-  });
-
-  if (uploadError) {
-    console.error("[budget-validation-upload]", uploadError.message);
-    return;
-  }
-
-  const { error } = await supabase.from("budget_validations").insert({
-    project_id: parsed.data.project_id,
-    name: project.name,
-    file_name: file.name,
-    file_url: path,
-    file_type: file.type || "application/pdf",
-    created_by: user.id,
-  });
-
-  if (error) {
-    console.error("[budget-validation-create]", error.message);
-    return;
-  }
-
-  revalidatePath("/dashboard");
+    .eq("id", value.project_id)
+    .single();
+  if (!project.data) return { error: "Obra no disponible." };
+  const previous = value.validation_id
+    ? await supabase
+        .from("budget_validations")
+        .select("file_url")
+        .eq("id", value.validation_id)
+        .eq("project_id", value.project_id)
+        .single()
+    : null;
+  if (value.validation_id && !previous?.data)
+    return { error: "Presupuesto no disponible." };
+  const fields = {
+    project_id: value.project_id,
+    name: project.data.name,
+    file_url: value.path,
+    file_name: value.name,
+    file_type: value.type,
+    is_validated: false,
+    validated_by: null,
+    validated_at: null,
+  };
+  const result = value.validation_id
+    ? await supabase
+        .from("budget_validations")
+        .update(fields)
+        .eq("id", value.validation_id)
+        .select("id")
+        .single()
+    : await supabase
+        .from("budget_validations")
+        .insert({ ...fields, created_by: user.id })
+        .select("id")
+        .single();
+  if (result.error)
+    return {
+      error: "No se pudo guardar el PDF. Revisa los permisos de validaciones.",
+    };
+  if (previous?.data?.file_url)
+    await supabase.storage
+      .from("project-files")
+      .remove([previous.data.file_url]);
   revalidatePath("/validations");
+  return { ok: true };
 }
 
-export async function validateBudgetAction(formData: FormData) {
-  const { supabase, user } = await requireUserProfile();
-  const validationId = z.string().uuid().parse(formData.get("validation_id"));
-
-  const { error } = await supabase
-    .from("budget_validations")
-    .update({
-      validation_notes: null,
-      is_validated: true,
-      validated_by: user.id,
-      validated_at: new Date().toISOString(),
+export async function reviewValidation(input: unknown) {
+  const { supabase, profile } = await requireUserProfile("validations");
+  if (!profile.permissions_ready)
+    return { error: "Falta activar la migracion de permisos en Supabase." };
+  const parsed = z
+    .object({
+      id: z.string().uuid(),
+      operation: z.enum(["approve", "notes"]),
+      notes: z.string().max(4000).optional(),
     })
-    .eq("id", validationId);
-
-  if (error) {
-    console.error("[budget-validation-ok]", error.message);
-    return;
-  }
-
-  revalidatePath("/dashboard");
-  revalidatePath("/validations");
-}
-
-export async function updateBudgetValidationNotesAction(formData: FormData) {
-  const { supabase } = await requireUserProfile();
-  const validationId = z.string().uuid().parse(formData.get("validation_id"));
-  const validationNotes = optionalNotes.parse(formData.get("validation_notes"));
-
-  const { error } = await supabase
-    .from("budget_validations")
-    .update({ validation_notes: validationNotes })
-    .eq("id", validationId);
-
-  if (error) {
-    console.error("[budget-validation-notes]", error.message);
-    return;
-  }
-
-  revalidatePath("/dashboard");
-  revalidatePath("/validations");
-}
-
-export async function updateBudgetValidationPdfAction(formData: FormData) {
-  const { supabase } = await requireUserProfile();
-  const validationId = z.string().uuid().parse(formData.get("validation_id"));
-  const oldFileUrl = z.string().min(1).optional().parse(formData.get("file_url") || undefined);
-  const file = formData.get("file");
-
-  if (!isUploadedFile(file)) return;
-  if (file.size > MAX_VALIDATION_FILE_SIZE) return;
-  if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) return;
-
-  const { data: validation, error: validationError } = await supabase
-    .from("budget_validations")
-    .select("project_id")
-    .eq("id", validationId)
-    .single<{ project_id: string | null }>();
-
-  if (validationError || !validation) {
-    console.error("[budget-validation-pdf-load]", validationError?.message ?? "Validacion no encontrada");
-    return;
-  }
-
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-  const folder = validation.project_id ?? "budget-validations";
-  const path = `${folder}/budget-validations/${crypto.randomUUID()}-${safeName}`;
-  const { error: uploadError } = await supabase.storage.from("project-files").upload(path, file, {
-    contentType: file.type || "application/pdf",
-    upsert: false,
+    .safeParse(input);
+  if (!parsed.success)
+    return { error: "Revisa los detalles (maximo 4000 caracteres)." };
+  const { error } = await supabase.rpc("review_budget_validation", {
+    p_id: parsed.data.id,
+    p_operation: parsed.data.operation,
+    p_notes: parsed.data.notes ?? null,
   });
-
-  if (uploadError) {
-    console.error("[budget-validation-pdf-upload]", uploadError.message);
-    return;
-  }
-
-  const { error } = await supabase
-    .from("budget_validations")
-    .update({
-      file_name: file.name,
-      file_url: path,
-      file_type: file.type || "application/pdf",
-      is_validated: false,
-      validated_by: null,
-      validated_at: null,
-    })
-    .eq("id", validationId);
-
-  if (error) {
-    console.error("[budget-validation-pdf-update]", error.message);
-    return;
-  }
-
-  if (oldFileUrl) {
-    const { error: storageError } = await supabase.storage.from("project-files").remove([oldFileUrl]);
-    if (storageError) {
-      console.error("[budget-validation-pdf-remove-old]", storageError.message);
-    }
-  }
-
-  revalidatePath("/dashboard");
+  if (error)
+    return {
+      error:
+        "No se pudo guardar. Puede que este presupuesto ya se haya revisado; actualiza la pagina.",
+    };
   revalidatePath("/validations");
+  return { ok: true };
 }
 
-export async function deleteBudgetValidationAction(formData: FormData) {
-  const { supabase } = await requireUserProfile();
-  const validationId = z.string().uuid().parse(formData.get("validation_id"));
-  const fileUrl = z.string().min(1).optional().parse(formData.get("file_url") || undefined);
-
-  const { error } = await supabase
+export async function deleteBudgetValidation(id: string) {
+  const { supabase } = await requireUserProfile("owner");
+  if (!z.string().uuid().safeParse(id).success)
+    return { error: "Presupuesto no valido." };
+  const { data, error } = await supabase
     .from("budget_validations")
     .delete()
-    .eq("id", validationId)
-    .eq("is_validated", true);
-
-  if (error) {
-    console.error("[budget-validation-delete]", error.message);
-    return;
-  }
-
-  if (fileUrl) {
-    const { error: storageError } = await supabase.storage.from("project-files").remove([fileUrl]);
-    if (storageError) {
-      console.error("[budget-validation-delete-file]", storageError.message);
-    }
-  }
-
-  revalidatePath("/dashboard");
+    .eq("id", id)
+    .eq("is_validated", true)
+    .select("file_url")
+    .single();
+  if (error || !data) return { error: "No se pudo borrar el validado." };
+  await supabase.storage.from("project-files").remove([data.file_url]);
   revalidatePath("/validations");
+  return { ok: true };
 }
-
-function isUploadedFile(value: FormDataEntryValue | null): value is File {
-  return typeof File !== "undefined" && value instanceof File && value.size > 0;
-}
-
-const optionalNotes = z.preprocess((value) => (typeof value === "string" && value.trim() ? value.trim() : null), z.string().nullable());

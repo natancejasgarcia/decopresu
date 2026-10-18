@@ -1,203 +1,325 @@
+"use client";
 import Link from "next/link";
-import { CheckCircle2, ChevronDown, FileCheck2, FileText, RefreshCw, Save, Trash2, Upload } from "lucide-react";
-import { createBudgetValidationAction, deleteBudgetValidationAction, updateBudgetValidationNotesAction, updateBudgetValidationPdfAction, validateBudgetAction } from "@/actions/budgetValidationActions";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Check,
+  ChevronDown,
+  FileText,
+  Save,
+  Trash2,
+  Upload,
+} from "lucide-react";
+import {
+  deleteBudgetValidation,
+  reviewValidation,
+  saveValidationPdf,
+} from "@/actions/budgetValidationActions";
+import { uploadPrivateFile } from "@/lib/uploadPrivateFile";
+import { useAsyncTask } from "@/lib/useAsyncTask";
 import type { BudgetValidation, Project } from "@/lib/types";
 
-type BudgetValidatorPanelProps = {
+export function BudgetValidatorPanel({
+  validations,
+  projects,
+  owner,
+  reviewer,
+}: {
   validations: BudgetValidation[];
   projects: Project[];
-};
-
-const timeFormatter = new Intl.DateTimeFormat("es-ES", {
-  day: "2-digit",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-export function BudgetValidatorPanel({ validations, projects }: BudgetValidatorPanelProps) {
-  const pending = validations.filter((item) => !item.is_validated || item.validation_notes);
-  const validated = validations.filter((item) => item.is_validated && !item.validation_notes);
-
+  owner: boolean;
+  reviewer: boolean;
+}) {
+  const [tab, setTab] = useState(false);
+  const [removed, setRemoved] = useState<{ id: string; status: boolean }[]>([]);
+  const [error, setError] = useState("");
+  const [pending, run] = useAsyncTask();
+  const router = useRouter();
+  // Only suppress rows still stale after a successful mutation; approved history remains visible.
+  const visible = validations.filter(
+    (v) => !removed.some((r) => r.id === v.id && r.status === v.is_validated),
+  );
+  const rows = visible.filter((v) => v.is_validated === (owner && tab));
   return (
-    <section className="mt-5 rounded-lg border border-line bg-white p-4 shadow-soft">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-800">
-            <FileCheck2 size={21} />
-          </div>
-          <div>
-            <p className="text-xs font-black uppercase text-clay">Validador de presupuestos</p>
-            <h2 className="text-xl font-black text-ink">PDF pendientes de OK</h2>
-            <p className="text-sm font-semibold text-muted">Elige obra y sube su PDF; se vincula solo al proyecto.</p>
-          </div>
-        </div>
-        <span className="inline-flex h-9 items-center rounded-full bg-paper px-3 text-sm font-black text-ink">
-          {pending.length} por validar
-        </span>
+    <section className="space-y-4">
+      <h1 className="text-2xl font-black">Revisar presupuestos</h1>
+      <div
+        role="tablist"
+        aria-label="Estado"
+        className="flex gap-2 border-b border-line pb-3"
+      >
+        {[false, ...(owner ? [true] : [])].map((value) => (
+          <button
+            role="tab"
+            aria-selected={tab === value}
+            key={String(value)}
+            onClick={() => setTab(value)}
+            className={`min-h-12 rounded-lg px-4 font-bold ${tab === value ? "bg-moss text-white" : "bg-white border border-line"}`}
+          >
+            {value ? "Validados" : "Pendientes"} (
+            {visible.filter((v) => v.is_validated === value).length})
+          </button>
+        ))}
       </div>
-
-      <form action={createBudgetValidationAction} encType="multipart/form-data" className="mt-4 grid gap-2 md:grid-cols-[1.2fr_1fr_auto]">
-        <select className="form-input h-12 py-0" name="project_id" defaultValue="" required>
-          <option value="" disabled>Seleccionar obra</option>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name} - {project.client_name}
+      {!reviewer && (
+        <form
+          className="grid gap-3 border-b border-line pb-4 sm:grid-cols-[1fr_1fr_auto]"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            const data = new FormData(form);
+            void run(async () => {
+              setError("");
+              try {
+                const file = data.get("file") as File;
+                const uploaded = await uploadPrivateFile(file, "validations");
+                const result = await saveValidationPdf({
+                  ...uploaded,
+                  project_id: data.get("project_id"),
+                  validation_id: null,
+                });
+                if (result.error) throw new Error(result.error);
+                form.reset();
+                router.refresh();
+              } catch (e) {
+                setError(
+                  e instanceof Error ? e.message : "No se pudo subir el PDF.",
+                );
+              }
+            });
+          }}
+        >
+          <select
+            aria-label="Obra"
+            name="project_id"
+            required
+            className="form-input"
+            defaultValue=""
+          >
+            <option value="" disabled>
+              Seleccionar obra
             </option>
-          ))}
-        </select>
-        <input
-          className="form-input h-12 py-1 file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-black file:text-white"
-          name="file"
-          type="file"
-          accept="application/pdf,.pdf"
-          required
-        />
-        <button className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-moss px-5 font-black text-white" type="submit">
-          <Upload size={18} />
-          Subir PDF
-        </button>
-      </form>
-
-      <div className="mt-4 grid gap-2">
-        {validations.length === 0 ? (
-          <div className="rounded-lg bg-paper p-4 text-sm font-semibold text-muted">
-            No hay presupuestos subidos para validar.
-          </div>
-        ) : (
-          <>
-            {pending.map((item) => (
-              <ValidationRow key={item.id} validation={item} />
+            {projects.map((p) => (
+              <option value={p.id} key={p.id}>
+                {p.name}
+              </option>
             ))}
-            {validated.length > 0 ? (
-              <div className="mt-2 border-t border-line pt-3">
-                <p className="mb-2 text-xs font-black uppercase text-muted">Validados</p>
-                <div className="grid gap-2">
-                  {validated.map((item) => (
-                    <ValidationRow key={item.id} validation={item} />
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </>
-        )}
-      </div>
+          </select>
+          <input
+            aria-label="PDF del presupuesto"
+            name="file"
+            className="form-input min-w-0"
+            type="file"
+            accept="application/pdf"
+            required
+          />
+          <button
+            disabled={pending}
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-moss px-4 font-bold text-white"
+          >
+            <Upload size={18} />
+            {pending ? "Subiendo..." : "Subir PDF"}
+          </button>
+        </form>
+      )}
+      {error && (
+        <p role="alert" className="text-red-700">
+          {error}
+        </p>
+      )}
+      {rows.length === 0 && (
+        <p role="status" className="p-6 text-muted">
+          {tab
+            ? "No hay presupuestos validados."
+            : "No quedan presupuestos por validar."}
+        </p>
+      )}
+      {rows.map((item) => (
+        <ValidationRow
+          key={item.id}
+          item={item}
+          reviewer={reviewer}
+          owner={owner}
+          onRemove={() =>
+            setRemoved((current) => [
+              ...current,
+              { id: item.id, status: item.is_validated },
+            ])
+          }
+        />
+      ))}
     </section>
   );
 }
 
-function ValidationRow({ validation }: { validation: BudgetValidation }) {
-  const createdAt = new Date(validation.created_at);
-
+function ValidationRow({
+  item,
+  reviewer,
+  owner,
+  onRemove,
+}: {
+  item: BudgetValidation;
+  reviewer: boolean;
+  owner: boolean;
+  onRemove: () => void;
+}) {
+  const [pending, run] = useAsyncTask();
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const router = useRouter();
+  function perform(task: () => Promise<{ error?: string }>, remove = false) {
+    void run(async () => {
+      setError("");
+      setMessage("");
+      try {
+        const result = await task();
+        if (result.error) throw new Error(result.error);
+        if (remove) onRemove();
+        else setMessage("Guardado");
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "No se pudo guardar.");
+      }
+    });
+  }
   return (
-    <details className={`group rounded-lg border p-3 ${
-      validation.validation_notes
-        ? "border-amber-200 bg-amber-50/70"
-        : validation.is_validated
-          ? "border-emerald-200 bg-emerald-50/70"
-          : "border-line bg-white"
-    }`}>
-      <summary className="cursor-pointer list-none">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <FileText size={17} className={validation.is_validated ? "text-emerald-800" : "text-moss"} />
-            {validation.project_id ? (
-              <Link className="text-sm font-black text-ink underline decoration-moss underline-offset-4" href={`/projects/${validation.project_id}`}>
-                {validation.name}
-              </Link>
-            ) : (
-              <strong className="text-sm text-ink">{validation.name}</strong>
-            )}
-            {validation.validation_notes ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800">
-                Pendiente de revisión
-              </span>
-            ) : validation.is_validated ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-xs font-black text-white">
-                <CheckCircle2 size={14} />
-                Validado
-              </span>
-            ) : null}
-          </div>
-          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-muted">
-            <span className="rounded-full bg-paper px-2 py-0.5 font-black text-ink">
-              {validation.project_name ?? "Sin obra"}
-            </span>
-            {validation.project_client_name ? <span>{validation.project_client_name}</span> : null}
-            <span>{validation.created_by_name ?? "Decoralia"} - {timeFormatter.format(createdAt)}</span>
-            {validation.signed_url ? (
-              <a className="font-black text-moss underline" href={validation.signed_url} target="_blank" rel="noreferrer">
-                Ver PDF
-              </a>
-            ) : null}
-          </div>
-        </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {validation.is_validated && !validation.validation_notes ? (
-              <span className="inline-flex h-10 items-center justify-center rounded-lg bg-emerald-100 px-4 text-sm font-black text-emerald-900">
-                OK
-              </span>
-            ) : null}
-            <span className="inline-flex h-10 items-center justify-center gap-1 rounded-lg border border-line bg-white px-3 text-sm font-black text-ink">
-              Detalles
-              <ChevronDown size={16} className="transition-transform group-open:rotate-180" />
-            </span>
-          </div>
-        </div>
+    <details
+      className={`group rounded-lg border p-4 ${item.is_validated ? "border-emerald-200 bg-emerald-50" : item.validation_notes ? "border-amber-300 bg-amber-50" : "border-line bg-white"}`}
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+        <span className="min-w-0 break-words font-bold">
+          {item.name}
+          <span className="mt-1 block text-sm font-normal text-muted">
+            {item.is_validated
+              ? "Validado"
+              : item.validation_notes
+                ? "Pendiente de revision"
+                : "Pendiente de OK"}
+          </span>
+        </span>
+        <ChevronDown className="shrink-0 group-open:rotate-180" size={20} />
       </summary>
-
-      <div className="mt-3 grid gap-3 border-t border-line pt-3">
-        <form action={updateBudgetValidationNotesAction} className="grid gap-2">
-          <input type="hidden" name="validation_id" value={validation.id} />
-          <label>
-            <span className="form-label">Detalles para revisar o corregir</span>
+      <div className="mt-4 space-y-4">
+        <div className="flex flex-wrap gap-3">
+          <a
+            href={item.signed_url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-12 items-center gap-2 rounded-lg border border-line bg-white px-4 font-bold text-moss"
+          >
+            <FileText size={20} />
+            Ver PDF
+          </a>
+          {!reviewer && item.project_id && (
+            <Link
+              href={`/projects/${item.project_id}`}
+              className="self-center font-bold text-moss underline"
+            >
+              Ir a la obra
+            </Link>
+          )}
+        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const data = new FormData(e.currentTarget);
+            perform(() =>
+              reviewValidation({
+                id: item.id,
+                operation: "notes",
+                notes: data.get("notes"),
+              }),
+            );
+          }}
+          className="grid gap-2"
+        >
+          <label className="font-bold">
+            Detalles para corregir
             <textarea
-              className="form-input min-h-24"
-              name="validation_notes"
-              defaultValue={validation.validation_notes ?? ""}
-              placeholder="Ej: falta cambiar el color, revisar medidas, añadir partida de materiales..."
+              name="notes"
+              defaultValue={item.validation_notes ?? ""}
+              maxLength={4000}
+              className="form-input mt-2 min-h-28"
             />
           </label>
-          <button className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 text-sm font-black text-ink" type="submit">
-            <Save size={16} />
+          <button
+            disabled={pending}
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 font-bold"
+          >
+            <Save size={18} />
             Guardar detalles
           </button>
         </form>
-
-        <form action={updateBudgetValidationPdfAction} encType="multipart/form-data" className="grid gap-2 rounded-lg bg-paper p-3 md:grid-cols-[1fr_auto]">
-          <input type="hidden" name="validation_id" value={validation.id} />
-          <input type="hidden" name="file_url" value={validation.file_url} />
-          <input
-            className="form-input h-11 py-1 file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-black file:text-white"
-            name="file"
-            type="file"
-            accept="application/pdf,.pdf"
-            required
-          />
-          <button className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-moss px-4 text-sm font-black text-white" type="submit">
-            <RefreshCw size={16} />
-            Cambiar PDF
-          </button>
-        </form>
-
-        {!validation.is_validated || validation.validation_notes ? (
-          <form action={validateBudgetAction} className="grid gap-2">
-            <input type="hidden" name="validation_id" value={validation.id} />
-            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 text-sm font-black text-white" type="submit">
-              <CheckCircle2 size={17} />
-              Validar con OK
+        {!reviewer && item.project_id && (
+          <form
+            className="grid gap-2 sm:grid-cols-[1fr_auto]"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const file = new FormData(e.currentTarget).get("file") as File;
+              perform(async () => {
+                const upload = await uploadPrivateFile(file, "validations");
+                return saveValidationPdf({
+                  ...upload,
+                  project_id: item.project_id,
+                  validation_id: item.id,
+                });
+              }, item.is_validated);
+            }}
+          >
+            <input
+              aria-label="Nuevo PDF"
+              type="file"
+              name="file"
+              accept="application/pdf"
+              required
+              className="form-input min-w-0"
+            />
+            <button
+              disabled={pending}
+              className="min-h-12 rounded-lg border border-line px-4 font-bold"
+            >
+              Cambiar PDF
             </button>
           </form>
+        )}
+        {!item.is_validated ? (
+          <button
+            disabled={pending}
+            onClick={() =>
+              perform(
+                () => reviewValidation({ id: item.id, operation: "approve" }),
+                true,
+              )
+            }
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 font-bold text-white"
+          >
+            <Check size={20} />
+            {pending ? "Guardando..." : "Dar OK"}
+          </button>
         ) : (
-          <form action={deleteBudgetValidationAction}>
-            <input type="hidden" name="validation_id" value={validation.id} />
-            <input type="hidden" name="file_url" value={validation.file_url} />
-            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-red-100 bg-red-50 px-5 text-sm font-black text-red-700" type="submit">
-              <Trash2 size={17} />
+          owner && (
+            <button
+              disabled={pending}
+              onClick={() => {
+                if (window.confirm("Borrar este validado y su PDF?"))
+                  perform(() => deleteBudgetValidation(item.id), true);
+              }}
+              className="inline-flex min-h-12 items-center gap-2 rounded-lg border border-red-200 px-4 font-bold text-red-700"
+            >
+              <Trash2 size={18} />
               Borrar validado
             </button>
-          </form>
+          )
+        )}
+        {error && (
+          <p role="alert" className="text-red-700">
+            {error}
+          </p>
+        )}
+        {message && (
+          <p role="status" className="text-emerald-800">
+            {message}
+          </p>
         )}
       </div>
     </details>

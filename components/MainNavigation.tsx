@@ -7,6 +7,7 @@ import {
   ReceiptText,
   UsersRound,
   WalletCards,
+  FileCheck2,
 } from "lucide-react";
 const items = [
   { href: "/dashboard", label: "Inicio", icon: House },
@@ -15,7 +16,13 @@ const items = [
   { href: "/finance", label: "Finanzas", icon: WalletCards },
   { href: "/clients", label: "Clientes", icon: UsersRound },
 ];
-export function MainNavigation({ mobile = false }: { mobile?: boolean }) {
+export function MainNavigation({
+  mobile = false,
+  reviewer = false,
+}: {
+  mobile?: boolean;
+  reviewer?: boolean;
+}) {
   const pathname = usePathname();
   return (
     <nav
@@ -24,11 +31,22 @@ export function MainNavigation({ mobile = false }: { mobile?: boolean }) {
       }
       className={
         mobile
-          ? "fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-white px-1 pb-[env(safe-area-inset-bottom)] lg:hidden"
+          ? `fixed inset-x-0 bottom-0 z-40 grid ${reviewer ? "grid-cols-3" : "grid-cols-5"} border-t border-line bg-white px-1 pb-[env(safe-area-inset-bottom)] lg:hidden`
           : "hidden items-center gap-1 lg:flex"
       }
     >
-      {items.map((item) => {
+      {(reviewer
+        ? [
+            { href: "/dashboard", label: "Inicio", icon: House },
+            { href: "/validations", label: "Validaciones", icon: FileCheck2 },
+            {
+              href: "/finance/scan",
+              label: "Subir facturas",
+              icon: ReceiptText,
+            },
+          ]
+        : items
+      ).map((item) => {
         const active =
           pathname === item.href || pathname.startsWith(item.href + "/");
         const Icon = item.icon;
