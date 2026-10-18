@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { fallbackAccess, reviewerPathAllowed } from "@/lib/access";
+// Vercel can bundle this entry independently of Next.js path aliases.
+import { fallbackAccess, reviewerPathAllowed } from "./lib/access";
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
