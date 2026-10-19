@@ -3,6 +3,129 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUserProfile } from "@/lib/auth";
 import { verifiedUpload, uploadMetadataSchema } from "@/lib/privateUploads";
+import { randomUUID } from "node:crypto";
+import { buildBudgetPdf } from "@/lib/budgetPdf";
+import { loadProjectBudget } from "@/lib/projectBudgetData";
+
+export async function sendProjectBudgetToValidation(input: unknown) {
+  const { supabase, user, profile } = await requireUserProfile();
+  if (!profile.permissions_ready)
+    return { error: "Falta activar los permisos de validaciones en Supabase." };
+  const parsed = z
+    .object({ project_id: z.string().uuid(), request_id: z.string().uuid() })
+    .safeParse(input);
+  if (!parsed.success)
+    return { error: "No se pudo identificar la obra. Actualiza la pagina." };
+  const { project_id: projectId, request_id: requestId } = parsed.data;
+  const storage = supabase.storage.from("project-files");
+  let uploadedPath: string | undefined;
+  let saved = false;
+  const refresh = () => {
+    revalidatePath("/validations");
+    revalidatePath("/projects");
+    revalidatePath("/dashboard");
+  };
+  try {
+    const existing = await supabase
+      .from("budget_validations")
+      .select("id")
+      .eq("id", requestId)
+      .eq("project_id", projectId)
+      .maybeSingle();
+    if (existing.error)
+      return { error: "No se pudo comprobar el envio. Intentalo de nuevo." };
+    if (existing.data) {
+      refresh();
+      return { ok: true, id: existing.data.id as string };
+    }
+    const budget = await loadProjectBudget(supabase, projectId);
+    if ("error" in budget) return { error: budget.error };
+    if (!budget.items.length)
+      return {
+        error: "Anade conceptos al presupuesto antes de enviarlo a validar.",
+      };
+    const pending = await supabase
+      .from("budget_validations")
+      .select("id,file_url")
+      .eq("project_id", projectId)
+      .eq("is_validated", false)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (pending.error)
+      return { error: "No se pudo comprobar las validaciones pendientes." };
+
+    const { bytes, filename } = await buildBudgetPdf(budget);
+    if (bytes.length > 10 * 1024 * 1024)
+      return { error: "El PDF supera el limite de 10 MB." };
+    const filePath = `validations/${user.id}/${randomUUID()}.pdf`;
+    const upload = await storage.upload(filePath, bytes, {
+      contentType: "application/pdf",
+      upsert: false,
+    });
+    if (upload.error)
+      return { error: "No se pudo subir el PDF. Intentalo de nuevo." };
+    uploadedPath = filePath;
+    const fields = {
+      project_id: projectId,
+      name: budget.project.name,
+      file_url: filePath,
+      file_name: filename,
+      file_type: "application/pdf",
+      is_validated: false,
+      validated_by: null,
+      validated_at: null,
+    };
+    // Never replace a PDF that another user has approved while it was being generated.
+    const result = pending.data
+      ? await supabase
+          .from("budget_validations")
+          .update(fields)
+          .eq("id", pending.data.id)
+          .eq("project_id", projectId)
+          .eq("is_validated", false)
+          .select("id")
+          .single()
+      : await supabase
+          .from("budget_validations")
+          .insert({ ...fields, id: requestId, created_by: user.id })
+          .select("id")
+          .single();
+    if (result.error || !result.data) {
+      if (result.error?.code === "23505") {
+        const retry = await supabase
+          .from("budget_validations")
+          .select("id")
+          .eq("id", requestId)
+          .eq("project_id", projectId)
+          .maybeSingle();
+        if (retry.data) {
+          refresh();
+          return { ok: true, id: retry.data.id as string };
+        }
+      }
+      return {
+        error:
+          "No se pudo guardar el envio. Actualiza la pagina e intentalo de nuevo.",
+      };
+    }
+    saved = true;
+    if (pending.data?.file_url) {
+      await storage.remove([pending.data.file_url]).catch(() => undefined);
+    }
+    refresh();
+    return { ok: true, id: result.data.id as string };
+  } catch (error) {
+    console.error(
+      "[Decoralia validaciones] Error enviando presupuesto:",
+      error,
+    );
+    return { error: "No se pudo enviar el presupuesto. Intentalo de nuevo." };
+  } finally {
+    if (uploadedPath && !saved)
+      await storage.remove([uploadedPath]).catch(() => undefined);
+  }
+}
 
 export async function saveValidationPdf(input: unknown) {
   const { supabase, user } = await requireUserProfile();
