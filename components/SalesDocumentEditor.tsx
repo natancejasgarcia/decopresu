@@ -7,6 +7,7 @@ import { useAsyncTask } from "@/lib/useAsyncTask";
 import {
   ArrowLeft,
   Check,
+  CircleDollarSign,
   Download,
   FileText,
   Plus,
@@ -27,14 +28,14 @@ import {
   roundAmount,
   SALES_LABELS,
   salesTotals,
-  todayMadrid,
   type SalesDocument,
   type SalesDraftInput,
   type SalesLine,
   type SalesPayment,
 } from "@/lib/sales";
 import { formatCurrency } from "@/lib/calculations";
-import { PAYMENT_METHODS } from "@/lib/types";
+import { SalesPartialInvoiceForm } from "@/components/SalesPartialInvoiceForm";
+import { SalesPaymentForm } from "@/components/SalesPaymentForm";
 
 function inputFrom(doc: SalesDocument): SalesDraftInput {
   return {
@@ -52,10 +53,14 @@ export function SalesDocumentEditor({
   document,
   payments,
   linkedInvoiceId,
+  initialPartial = false,
+  initialCollect = false,
 }: {
   document: SalesDocument;
   payments: SalesPayment[];
   linkedInvoiceId?: string;
+  initialPartial?: boolean;
+  initialCollect?: boolean;
 }) {
   const router = useRouter();
   const [input, setInput] = useState(() => inputFrom(document));
@@ -65,17 +70,65 @@ export function SalesDocumentEditor({
     error: boolean;
     text: string;
   } | null>(null);
-  const [confirm, setConfirm] = useState<"issue" | "delete" | null>(null);
+  const [confirm, setConfirm] = useState<"issue" | "delete" | "collect" | null>(
+    () =>
+      initialCollect &&
+      document.kind === "invoice" &&
+      document.status === "issued" &&
+      documentBalance(document, payments).outstanding > 0
+        ? "collect"
+        : null,
+  );
+  const [partialOpen, setPartialOpen] = useState(
+    initialPartial &&
+      document.kind === "invoice" &&
+      !document.source_document_id &&
+      document.status === "draft",
+  );
+  const [savedPayments, setSavedPayments] = useState<SalesPayment[]>([]);
   const [dirty, setDirty] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const collectionPromptSeen = useRef(false);
   const readonly = document.status === "issued";
   const title = SALES_LABELS[document.kind];
   const totals = salesTotals(input.lines);
-  const balance = documentBalance(document, payments);
+  const allPayments = [
+    ...payments,
+    ...savedPayments.filter(
+      (payment) => !payments.some((existing) => existing.id === payment.id),
+    ),
+  ];
+  const balance = documentBalance(document, allPayments);
   useEffect(() => {
-    if (confirm) cancelRef.current?.focus();
+    setSavedPayments((current) => {
+      const remaining = current.filter(
+        (payment) => !payments.some((saved) => saved.id === payment.id),
+      );
+      return remaining.length === current.length ? current : remaining;
+    });
+  }, [payments]);
+  useEffect(() => {
+    if (confirm === "collect") dialogRef.current?.focus();
+    else if (confirm) cancelRef.current?.focus();
   }, [confirm]);
+  useEffect(() => {
+    if (!initialCollect) {
+      collectionPromptSeen.current = false;
+      return;
+    }
+    if (
+      initialCollect &&
+      !collectionPromptSeen.current &&
+      readonly &&
+      document.kind === "invoice" &&
+      balance.outstanding > 0
+    ) {
+      collectionPromptSeen.current = true;
+      setConfirm("collect");
+    }
+  }, [initialCollect, readonly, document.kind, balance.outstanding]);
   useEffect(() => {
     if (!dirty) return;
     const handler = (event: BeforeUnloadEvent) => {
@@ -115,6 +168,13 @@ export function SalesDocumentEditor({
     });
   }
   async function save() {
+    if (partialOpen) {
+      setFeedback({
+        error: true,
+        text: "Aplica el importe parcial o cancela ese cambio antes de guardar.",
+      });
+      return false;
+    }
     const result = await saveSalesDocumentAction(document.id, input);
     if (!result.ok) {
       setFeedback({ error: true, text: result.error });
@@ -150,6 +210,42 @@ export function SalesDocumentEditor({
       setFeedback({
         error: false,
         text: `${title} emitido: ${result.number}.`,
+      });
+      if (document.kind === "invoice" && totals.total > 0) {
+        router.replace(`/sales/${document.id}?collect=1`, { scroll: false });
+      } else {
+        router.refresh();
+      }
+    });
+  }
+  function closeCollection() {
+    setConfirm(null);
+    setPaymentOpen(false);
+    router.replace(`/sales/${document.id}`, { scroll: false });
+  }
+  function savePayment(values: FormData) {
+    run(async () => {
+      const result = await recordSalesPaymentAction(document.id, values);
+      if (!result.ok) {
+        setFeedback({ error: true, text: result.error });
+        return;
+      }
+      const paymentId = result.id;
+      if (paymentId)
+        setSavedPayments((current) => [
+          ...current,
+          {
+            id: paymentId,
+            sales_document_id: document.id,
+            amount: Number(String(values.get("amount")).replace(",", ".")),
+            payment_date: String(values.get("date")),
+            method: String(values.get("method")),
+          },
+        ]);
+      closeCollection();
+      setFeedback({
+        error: false,
+        text: "Cobro guardado en la factura y en Finanzas.",
       });
       router.refresh();
     });
@@ -234,7 +330,7 @@ export function SalesDocumentEditor({
           )}
           <button
             className="action-secondary"
-            disabled={downloading || dirty || pending}
+            disabled={downloading || dirty || pending || partialOpen}
             onClick={download}
             type="button"
           >
@@ -297,6 +393,41 @@ export function SalesDocumentEditor({
           {feedback.text}
         </p>
       )}
+      {!readonly &&
+        document.kind === "invoice" &&
+        !document.source_document_id && (
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
+              <h2 className="text-xl font-bold">Facturación parcial</h2>
+              <button
+                className="action-secondary"
+                type="button"
+                disabled={pending}
+                aria-expanded={partialOpen}
+                aria-controls="partial-invoice-form"
+                onClick={() => setPartialOpen(!partialOpen)}
+              >
+                <CircleDollarSign size={20} />
+                Importe libre
+              </button>
+            </div>
+            {partialOpen && (
+              <SalesPartialInvoiceForm
+                sourceLabel={document.source_label}
+                disabled={pending}
+                onCancel={() => setPartialOpen(false)}
+                onApply={(line) => {
+                  update("lines", [line]);
+                  setPartialOpen(false);
+                  setFeedback({
+                    error: false,
+                    text: "Importe parcial aplicado al borrador. El presupuesto de la obra no cambia.",
+                  });
+                }}
+              />
+            )}
+          </section>
+        )}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -521,7 +652,7 @@ export function SalesDocumentEditor({
             <button
               className="action-secondary"
               type="submit"
-              disabled={pending}
+              disabled={pending || partialOpen}
             >
               <Save size={20} />
               {pending ? "Guardando…" : "Guardar borrador"}
@@ -529,7 +660,7 @@ export function SalesDocumentEditor({
             <button
               className="action-primary"
               type="button"
-              disabled={pending || input.lines.length === 0}
+              disabled={pending || input.lines.length === 0 || partialOpen}
               onClick={() => setConfirm("issue")}
             >
               <Check size={20} />
@@ -575,82 +706,18 @@ export function SalesDocumentEditor({
               </button>
             )}
           </div>
-          {paymentOpen && (
-            <form
-              key={payments.length}
-              className="my-4 grid gap-3 sm:grid-cols-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const values = new FormData(event.currentTarget);
-                run(async () => {
-                  const result = await recordSalesPaymentAction(
-                    document.id,
-                    values,
-                  );
-                  if (!result.ok) {
-                    setFeedback({ error: true, text: result.error });
-                    return;
-                  }
-                  setPaymentOpen(false);
-                  setFeedback({
-                    error: false,
-                    text: "Cobro guardado en la factura y en Finanzas.",
-                  });
-                  router.refresh();
-                });
-              }}
-            >
-              <label>
-                <span className="form-label">Importe (€)</span>
-                <input
-                  className="form-input"
-                  name="amount"
-                  type="number"
-                  min="0.01"
-                  max={balance.outstanding}
-                  step="0.01"
-                  defaultValue={balance.outstanding}
-                  required
-                />
-              </label>
-              <label>
-                <span className="form-label">Fecha</span>
-                <input
-                  className="form-input"
-                  type="date"
-                  name="date"
-                  min={document.issue_date}
-                  defaultValue={todayMadrid()}
-                  required
-                />
-              </label>
-              <label>
-                <span className="form-label">Forma de pago</span>
-                <select className="form-input" name="method">
-                  {PAYMENT_METHODS.map((m) => (
-                    <option key={m}>{m}</option>
-                  ))}
-                </select>
-              </label>
-              <button
-                className="action-primary"
-                disabled={pending}
-                type="submit"
-              >
-                <Save size={20} />
-                {pending ? "Guardando…" : "Guardar cobro"}
-              </button>
-              <button
-                className="action-secondary"
-                type="button"
-                onClick={() => setPaymentOpen(false)}
-              >
-                Cancelar
-              </button>
-            </form>
+          {paymentOpen && balance.outstanding > 0 && (
+            <SalesPaymentForm
+              key={balance.outstanding}
+              outstanding={balance.outstanding}
+              issueDate={document.issue_date}
+              pending={pending}
+              onSave={savePayment}
+              onCancel={closeCollection}
+            />
           )}
           <ul className="mt-4 divide-y divide-line">
-            {payments
+            {allPayments
               .filter((p) => p.sales_document_id === document.id)
               .map((p) => (
                 <li
@@ -670,39 +737,48 @@ export function SalesDocumentEditor({
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           onKeyDown={(e) => {
-            if (e.key === "Escape" && !pending) setConfirm(null);
+            if (e.key === "Escape" && !pending) {
+              if (confirm === "collect") closeCollection();
+              else setConfirm(null);
+            }
             if (e.key === "Tab") {
               e.preventDefault();
-              const buttons = Array.from(
-                e.currentTarget.querySelectorAll<HTMLButtonElement>(
-                  "button:not(:disabled)",
+              const controls = Array.from(
+                e.currentTarget.querySelectorAll<HTMLElement>(
+                  "button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]",
                 ),
               );
-              const index = buttons.indexOf(
-                window.document.activeElement as HTMLButtonElement,
+              const index = controls.indexOf(
+                window.document.activeElement as HTMLElement,
               );
-              buttons[
-                (index + (e.shiftKey ? -1 : 1) + buttons.length) %
-                  buttons.length
+              controls[
+                (index + (e.shiftKey ? -1 : 1) + controls.length) %
+                  controls.length
               ]?.focus();
             }
           }}
         >
           <div
-            className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl"
+            ref={dialogRef}
+            tabIndex={-1}
+            className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-5 shadow-xl sm:p-6"
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-title"
           >
             <h2 id="confirm-title" className="text-2xl font-bold">
-              {confirm === "issue"
-                ? `Emitir ${title.toLocaleLowerCase("es")}`
-                : "Borrar este borrador"}
+              {confirm === "collect"
+                ? "Factura emitida. ¿Registrar cobro?"
+                : confirm === "issue"
+                  ? `Emitir ${title.toLocaleLowerCase("es")}`
+                  : "Borrar este borrador"}
             </h2>
             <p className="mt-4 leading-7">
-              {confirm === "issue"
-                ? `Cliente: ${input.client_name || "sin nombre"}. Total: ${formatCurrency(totals.total)}. Se asignará un número y los conceptos quedarán bloqueados.`
-                : "Se eliminará este borrador. La obra y el presupuesto de origen se conservan."}
+              {confirm === "collect"
+                ? `${document.number ?? "Factura"} · Pendiente ${formatCurrency(balance.outstanding)}.`
+                : confirm === "issue"
+                  ? `Cliente: ${input.client_name || "sin nombre"}. Total: ${formatCurrency(totals.total)}. Se asignará un número y los conceptos quedarán bloqueados.`
+                  : "Se eliminará este borrador. La obra y el presupuesto de origen se conservan."}
             </p>
             {confirm === "issue" && document.kind === "invoice" && (
               <p className="mt-3 text-sm font-semibold text-amber-900">
@@ -710,31 +786,48 @@ export function SalesDocumentEditor({
                 está pendiente.
               </p>
             )}
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button
-                ref={cancelRef}
-                className="action-secondary"
-                type="button"
-                disabled={pending}
-                onClick={() => setConfirm(null)}
-              >
-                <X size={20} />
-                Volver
-              </button>
-              <button
-                className="action-primary"
-                type="button"
-                disabled={pending}
-                onClick={confirmAction}
-              >
-                <Check size={20} />
-                {pending
-                  ? "Procesando…"
-                  : confirm === "issue"
-                    ? "Confirmar emisión"
-                    : "Borrar borrador"}
-              </button>
-            </div>
+            {confirm === "collect" ? (
+              <>
+                {feedback?.error && (
+                  <p className="feedback-error mt-3" role="alert">
+                    {feedback.text}
+                  </p>
+                )}
+                <SalesPaymentForm
+                  outstanding={balance.outstanding}
+                  issueDate={document.issue_date}
+                  pending={pending}
+                  onSave={savePayment}
+                  onCancel={closeCollection}
+                />
+              </>
+            ) : (
+              <div className="mt-6 flex flex-wrap gap-3">
+                <button
+                  ref={cancelRef}
+                  className="action-secondary"
+                  type="button"
+                  disabled={pending}
+                  onClick={() => setConfirm(null)}
+                >
+                  <X size={20} />
+                  Volver
+                </button>
+                <button
+                  className="action-primary"
+                  type="button"
+                  disabled={pending}
+                  onClick={confirmAction}
+                >
+                  <Check size={20} />
+                  {pending
+                    ? "Procesando…"
+                    : confirm === "issue"
+                      ? "Confirmar emisión"
+                      : "Borrar borrador"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

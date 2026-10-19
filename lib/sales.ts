@@ -81,6 +81,20 @@ export const salesLineSchema = z.object({
   unit_price: numeric,
   vat_rate: z.union([z.literal(0), z.literal(10), z.literal(21)]),
 });
+export const partialInvoiceSchema = z.object({
+  amount: numeric.refine(
+    (value) => value > 0 && roundAmount(value) === value,
+    "Escribe un importe mayor que cero y con un máximo de dos decimales.",
+  ),
+  concept: salesLineSchema.shape.concept,
+  notes: salesLineSchema.shape.notes,
+  vat_rate: salesLineSchema.shape.vat_rate,
+});
+export type PartialInvoiceInput = z.infer<typeof partialInvoiceSchema>;
+export function partialInvoiceLine(input: PartialInvoiceInput): SalesLine {
+  const { amount, ...details } = partialInvoiceSchema.parse(input);
+  return { ...details, quantity: 1, unit: "", unit_price: amount };
+}
 export const dateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)

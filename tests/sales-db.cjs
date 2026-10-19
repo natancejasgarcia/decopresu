@@ -40,6 +40,7 @@ async function main() {
       insert into public.projects(id,name,client_name,client_phone,address,description) values ('${project}','Obra de prueba','Cliente','600000000','Direccion ejemplo','Pintura');
       insert into public.budget_items(project_id,concept,quantity,unit,unit_price) values ('${project}','Pintura paredes',56.86,'m2',95);
       grant select,insert,update,delete on public.project_payments to authenticated;
+      grant select on public.budget_items to authenticated;
       select set_config('request.jwt.claim.sub','${user}',false);
       set role authenticated;
     `);
@@ -193,6 +194,82 @@ async function main() {
         .number,
       "F/2026/0002",
     );
+    const partialIds = [];
+    for (const [index, amount] of [300, 700].entries()) {
+      const partial = await one(
+        "select public.create_sales_document('invoice',$1) as id",
+        [project],
+      );
+      partialIds.push(partial.id);
+      await db.query("select public.save_sales_document($1,$2)", [
+        partial.id,
+        JSON.stringify({
+          ...invoiceData,
+          lines: [
+            {
+              concept: `Factura parcial ${index + 1}`,
+              notes: "Trabajos de la obra",
+              quantity: 1,
+              unit: "",
+              unit_price: amount,
+              vat_rate: 21,
+            },
+          ],
+        }),
+      ]);
+      await db.query("select public.issue_sales_document($1)", [partial.id]);
+    }
+    const partialDoc = await one("select * from sales_documents where id=$1", [
+      partialIds[0],
+    ]);
+    assert.equal(Number(partialDoc.total), 363);
+    assert.equal(
+      (
+        await db.query(
+          "select * from project_payments where sales_document_id=any($1::uuid[])",
+          [partialIds],
+        )
+      ).rows.length,
+      0,
+      "Issuing partial invoices does not create income",
+    );
+    await db.query(
+      "select public.record_sales_payment($1,100,'2026-11-03','Tarjeta')",
+      [partialIds[0]],
+    );
+    const partialPayment = await one(
+      "select * from project_payments where sales_document_id=$1",
+      [partialIds[0]],
+    );
+    assert.equal(partialPayment.project_id, project);
+    assert.equal(Number(partialPayment.amount), 100);
+    assert.equal(
+      new Date(partialPayment.payment_date).toISOString().slice(0, 10),
+      "2026-11-03",
+    );
+    assert.equal(
+      Number(
+        (
+          await one(
+            "select sum(total) as total from sales_documents where id=any($1::uuid[])",
+            [partialIds],
+          )
+        ).total,
+      ),
+      1210,
+    );
+    assert.equal(
+      Number(
+        (
+          await one(
+            "select sum(quantity * unit_price) as total from budget_items where project_id=$1",
+            [project],
+          )
+        ).total,
+      ),
+      5401.7,
+      "The original budget is unchanged",
+    );
     await db.exec(
       "reset role; select set_config('request.jwt.claim.sub','',false); set role authenticated;",
     );
@@ -210,7 +287,7 @@ async function main() {
       /permission denied/,
     );
     console.log(
-      "PASS: migration repeatability, RLS, numbering, conversion, immutable snapshots and partial collections.",
+      "PASS: migration repeatability, RLS, numbering, conversion, immutable snapshots, partial invoices, dated collections and unchanged budgets.",
     );
   } finally {
     await db.close();

@@ -8,8 +8,10 @@ import type { SalesDocument, SalesPayment } from "@/lib/sales";
 export const dynamic = "force-dynamic";
 export default async function SalesDocumentPage({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  searchParams: { partial?: string; collect?: string };
 }) {
   const { supabase, profile } = await requireUserProfile();
   if (!z.string().uuid().safeParse(params.id).success) notFound();
@@ -48,6 +50,8 @@ export default async function SalesDocumentPage({
           document={document}
           payments={payments ?? []}
           linkedInvoiceId={invoice?.id}
+          initialPartial={searchParams.partial === "1"}
+          initialCollect={searchParams.collect === "1"}
         />
       </div>
     </main>

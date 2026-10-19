@@ -104,6 +104,59 @@ test("partial collections are isolated by invoice and never generate negative ou
     { paid: 314.6, outstanding: 0 },
   );
 });
+
+test("partial invoices use the requested base and VAT without changing the budget", () => {
+  const original = structuredClone(line);
+  for (const [vat, tax, total] of [
+    [21, 210, 1210],
+    [10, 100, 1100],
+    [0, 0, 1000],
+  ]) {
+    const partial = sales.partialInvoiceLine({
+      amount: "1000,00",
+      vat_rate: vat,
+      concept: "Anticipo de obra",
+      notes: "Primera parte",
+    });
+    assert.deepEqual(partial, {
+      concept: "Anticipo de obra",
+      notes: "Primera parte",
+      quantity: 1,
+      unit: "",
+      unit_price: 1000,
+      vat_rate: vat,
+    });
+    assert.equal(sales.salesTotals([partial]).tax, tax);
+    assert.equal(sales.salesTotals([partial]).total, total);
+  }
+  assert.deepEqual(line, original);
+  assert.equal(
+    sales.partialInvoiceLine({
+      amount: "56,86",
+      vat_rate: 21,
+      concept: "Parcial",
+      notes: "",
+    }).unit_price,
+    56.86,
+  );
+});
+
+test("partial invoices reject invalid prices, excessive decimals and empty concepts", () => {
+  const valid = { amount: 100, vat_rate: 21, concept: "Parcial", notes: "" };
+  for (const amount of ["", "abc", 0, -1, NaN, Infinity, 0.001, 10000000]) {
+    assert.equal(
+      sales.partialInvoiceSchema.safeParse({ ...valid, amount }).success,
+      false,
+      String(amount),
+    );
+  }
+  for (const patch of [{ concept: "  " }, { vat_rate: 15 }]) {
+    assert.equal(
+      sales.partialInvoiceSchema.safeParse({ ...valid, ...patch }).success,
+      false,
+    );
+  }
+});
 test("PDF generation produces A4 pages for long descriptions and unsupported characters", async () => {
   const { PDFDocument } = require("pdf-lib");
   const document = {

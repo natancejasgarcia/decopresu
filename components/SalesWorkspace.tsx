@@ -48,6 +48,7 @@ export function SalesWorkspace({
   const [pending, startTransition] = useAsyncTask();
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
+  const [invoiceMode, setInvoiceMode] = useState<"full" | "partial">("full");
   const today = todayMadrid();
   const scopedDocuments = documents.filter(
     (d) => !projectId || d.project_id === projectId,
@@ -95,7 +96,9 @@ export function SalesWorkspace({
           setError(result.error);
           return;
         }
-        router.push(`/sales/${result.id}`);
+        router.push(
+          `/sales/${result.id}${kind === "invoice" && invoiceMode === "partial" ? "?partial=1" : ""}`,
+        );
       } catch {
         setError("No se pudo conectar. Vuelve a intentarlo.");
       }
@@ -251,6 +254,34 @@ export function SalesWorkspace({
                   ))}
                 </select>
               </label>
+              {kind === "invoice" && (
+                <fieldset
+                  className="flex min-w-0 flex-wrap gap-4 sm:col-span-2 sm:row-start-1"
+                  disabled={pending}
+                >
+                  <legend className="form-label mb-2">Tipo de factura</legend>
+                  <label className="flex min-h-11 items-center gap-2">
+                    <input
+                      type="radio"
+                      name="invoice-mode"
+                      value="full"
+                      checked={invoiceMode === "full"}
+                      onChange={() => setInvoiceMode("full")}
+                    />
+                    Factura completa
+                  </label>
+                  <label className="flex min-h-11 items-center gap-2">
+                    <input
+                      type="radio"
+                      name="invoice-mode"
+                      value="partial"
+                      checked={invoiceMode === "partial"}
+                      onChange={() => setInvoiceMode("partial")}
+                    />
+                    Factura parcial
+                  </label>
+                </fieldset>
+              )}
               <button
                 type="button"
                 className="action-primary self-end"

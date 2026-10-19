@@ -127,7 +127,7 @@ export async function recordSalesPaymentAction(
       ok: false,
       error: "Revisa el importe, la fecha y la forma de pago.",
     };
-  const { error } = await supabase.rpc("record_sales_payment", {
+  const { data, error } = await supabase.rpc("record_sales_payment", {
     p_id: id,
     p_amount: parsed.data.amount,
     p_date: parsed.data.date,
@@ -135,7 +135,7 @@ export async function recordSalesPaymentAction(
   });
   if (error) return failure(error);
   refresh(id);
-  return { ok: true };
+  return { ok: true, id: String(data) };
 }
 export async function saveCompanyAction(
   input: z.infer<typeof companySchema>,
