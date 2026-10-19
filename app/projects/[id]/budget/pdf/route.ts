@@ -2,12 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { loadProjectBudget } from "@/lib/projectBudgetData";
 import { buildBudgetPdf } from "@/lib/budgetPdf";
+import { budgetVatSchema } from "@/lib/budgetVat";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } },
 ) {
   try {
@@ -25,13 +26,24 @@ export async function GET(
     if (!profile)
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
+    const selectedVat = budgetVatSchema.safeParse(
+      request.nextUrl?.searchParams.get("vat_rate"),
+    );
+    if (!selectedVat.success)
+      return NextResponse.json(
+        { error: "Selecciona un IVA del 10 % o del 21 %." },
+        { status: 400 },
+      );
     const budget = await loadProjectBudget(supabase, params.id);
     if ("error" in budget)
       return NextResponse.json(
         { error: budget.error },
         { status: budget.status },
       );
-    const { bytes, filename } = await buildBudgetPdf(budget);
+    const { bytes, filename } = await buildBudgetPdf({
+      ...budget,
+      vatRate: selectedVat.data,
+    });
     return new NextResponse(bytes, {
       headers: {
         "Content-Type": "application/pdf",

@@ -2,13 +2,13 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { sortBudgetItems } from "@/lib/budget";
+import { budgetVatSchema, budgetVatTotals, DEFAULT_BUDGET_VAT, type BudgetVatRate } from "@/lib/budgetVat";
 import { safePdfText } from "@/lib/pdfText";
 import type { BudgetItem, Project, Room } from "@/lib/types";
 
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
 const MARGIN = 36;
-const VAT_RATE = 0.21;
 const INK = rgb(0.08, 0.15, 0.19);
 const MUTED = rgb(0.32, 0.38, 0.42);
 const LINE = rgb(0.82, 0.85, 0.83);
@@ -127,16 +127,16 @@ function drawTableHeader(page: PDFPage, y: number, headers: Array<{ label: strin
   return y - 18;
 }
 
-export async function buildBudgetPdf({ project, items: itemsData, rooms: roomsData }: {
+export async function buildBudgetPdf({ project, items: itemsData, rooms: roomsData, vatRate = DEFAULT_BUDGET_VAT }: {
   project: Project;
   items: BudgetItem[];
   rooms: Room[];
+  vatRate?: BudgetVatRate;
 }) {
   const items = sortBudgetItems(itemsData ?? []);
   const rooms = roomsData ?? [];
-  const taxableBase = items.reduce((sum, item) => sum + Number(item.total), 0);
-  const vat = taxableBase * VAT_RATE;
-  const total = taxableBase + vat;
+  const selectedVat = budgetVatSchema.parse(vatRate);
+  const { taxableBase, vat, total } = budgetVatTotals(items.reduce((sum, item) => sum + Number(item.total), 0), selectedVat);
   const issuedAt = new Date();
   const expiresAt = addDays(issuedAt, 14);
 
@@ -238,7 +238,7 @@ export async function buildBudgetPdf({ project, items: itemsData, rooms: roomsDa
   page.drawRectangle({ x: totalsX, y: y - 66, width: 210, height: 66, color: LIGHT });
   page.drawText("Base imponible:", { x: totalsX + 12, y: y - 18, size: 8.5, font: fonts.bold, color: MUTED });
   page.drawText(money(taxableBase), { x: totalsX + 198 - fonts.bold.widthOfTextAtSize(money(taxableBase), 8.5), y: y - 18, size: 8.5, font: fonts.bold, color: INK });
-  page.drawText("IVA (21%):", { x: totalsX + 12, y: y - 36, size: 8.5, font: fonts.bold, color: MUTED });
+  page.drawText(`IVA (${selectedVat}%):`, { x: totalsX + 12, y: y - 36, size: 8.5, font: fonts.bold, color: MUTED });
   page.drawText(money(vat), { x: totalsX + 198 - fonts.bold.widthOfTextAtSize(money(vat), 8.5), y: y - 36, size: 8.5, font: fonts.bold, color: INK });
   page.drawRectangle({ x: totalsX, y: y - 98, width: 210, height: 26, color: INK });
   page.drawText("TOTAL:", { x: totalsX + 12, y: y - 88, size: 10, font: fonts.bold, color: rgb(1, 1, 1) });

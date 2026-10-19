@@ -12,6 +12,7 @@ import {
   updateBudgetItemAction,
 } from "@/actions/budgetActions";
 import { sortBudgetItems } from "@/lib/budget";
+import { budgetVatTotals, DEFAULT_BUDGET_VAT, type BudgetVatRate } from "@/lib/budgetVat";
 import { BudgetConceptFields } from "@/components/BudgetConceptFields";
 import { buildBudgetConceptCatalog, type BudgetConceptSuggestion } from "@/lib/budgetConcepts";
 import { formatCurrency } from "@/lib/calculations";
@@ -44,12 +45,14 @@ export function BudgetBuilder({ projectId, items, rooms, conceptSuggestions = []
   const [editIsFixedPrice, setEditIsFixedPrice] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [vatRate, setVatRate] = useState<BudgetVatRate>(DEFAULT_BUDGET_VAT);
   const [newConceptKey, setNewConceptKey] = useState(0);
   const conceptCatalog = useMemo(() => buildBudgetConceptCatalog([
     ...[...orderedItems].reverse().map((item) => ({ concept: item.concept, notes: item.notes ?? "" })),
     ...conceptSuggestions,
   ]), [orderedItems, conceptSuggestions]);
   const total = useMemo(() => orderedItems.reduce((sum, item) => sum + Number(item.total), 0), [orderedItems]);
+  const vatTotals = budgetVatTotals(total, vatRate);
   const roomArea = useMemo(
     () => rooms.reduce((sum, room) => sum + Number(room.total_paintable_area) + getRoomModulesArea(room), 0),
     [rooms],
@@ -62,6 +65,10 @@ export function BudgetBuilder({ projectId, items, rooms, conceptSuggestions = []
   useEffect(() => {
     setOrderedItems(sortBudgetItems(items));
   }, [items]);
+
+  useEffect(() => {
+    setVatRate(DEFAULT_BUDGET_VAT);
+  }, [projectId]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -116,7 +123,7 @@ export function BudgetBuilder({ projectId, items, rooms, conceptSuggestions = []
     setIsDownloadingPdf(true);
 
     try {
-      const response = await fetch(`/projects/${projectId}/budget/pdf`, {
+      const response = await fetch(`/projects/${projectId}/budget/pdf?vat_rate=${vatRate}`, {
         credentials: "same-origin",
       });
 
@@ -218,7 +225,16 @@ export function BudgetBuilder({ projectId, items, rooms, conceptSuggestions = []
           <h2>Presupuesto</h2>
           <p className="mt-1 text-sm text-muted">Crea conceptos manuales o deja que la IA rellene cards editables desde los archivos de la obra.</p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-wrap items-end gap-2">
+          <fieldset disabled={isDownloadingPdf}>
+            <legend className="mb-1 text-sm font-bold">IVA del PDF</legend>
+            <div className="flex gap-2">
+              {([10, 21] as const).map((rate) => <label key={rate} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 font-bold ${vatRate === rate ? "border-moss bg-emerald-50 text-moss" : "border-line bg-white text-ink"}`}>
+                <input className="accent-moss" type="radio" name={`budget-vat-${projectId}`} value={rate} checked={vatRate === rate} onChange={() => setVatRate(rate)} />
+                {rate} %
+              </label>)}
+            </div>
+          </fieldset>
           <button
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-ink px-3 text-sm font-black text-white disabled:opacity-60"
             disabled={isPending}
@@ -451,9 +467,12 @@ export function BudgetBuilder({ projectId, items, rooms, conceptSuggestions = []
         )}
       </div>
       <div className="mt-4 rounded-lg bg-ink p-4 text-white">
-        <span className="block text-sm font-bold text-white/70">Total presupuesto</span>
-        <strong className="text-2xl">{formatCurrency(total)}</strong>
-        <p className="mt-1 text-sm font-bold text-white/75">IVA no incluido</p>
+        <dl className="mb-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-2 text-sm">
+          <dt className="text-white/75">Base imponible</dt><dd className="font-bold">{formatCurrency(vatTotals.taxableBase)}</dd>
+          <dt className="text-white/75">IVA ({vatRate} %)</dt><dd className="font-bold">{formatCurrency(vatTotals.vat)}</dd>
+        </dl>
+        <span className="block text-sm font-bold text-white/70">Total con IVA</span>
+        <strong className="text-2xl">{formatCurrency(vatTotals.total)}</strong>
       </div>
     </section>
   );

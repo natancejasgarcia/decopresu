@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { PrintButton } from "@/components/PrintButton";
 import { sortBudgetItems } from "@/lib/budget";
+import { budgetVatSchema, budgetVatTotals } from "@/lib/budgetVat";
 import { formatCurrency } from "@/lib/calculations";
 import { requireUserProfile } from "@/lib/auth";
 import type { BudgetItem, Project } from "@/lib/types";
@@ -13,9 +14,8 @@ type PrintBudgetPageProps = {
   params: {
     id: string;
   };
+  searchParams: { vat_rate?: string };
 };
-
-const VAT_RATE = 0.21;
 
 const BUDGET_COMMENTS = [
   "Presupuesto válido 30 días.",
@@ -49,8 +49,10 @@ function getBudgetNumber(project: Project) {
   return `${year}-${project.id.slice(0, 4).toUpperCase()}`;
 }
 
-export default async function PrintBudgetPage({ params }: PrintBudgetPageProps) {
+export default async function PrintBudgetPage({ params, searchParams }: PrintBudgetPageProps) {
   const { supabase } = await requireUserProfile();
+  const selectedVat = budgetVatSchema.safeParse(searchParams?.vat_rate);
+  if (!selectedVat.success) notFound();
   const { data: project } = await supabase
     .from("projects")
     .select("*")
@@ -69,9 +71,7 @@ export default async function PrintBudgetPage({ params }: PrintBudgetPageProps) 
     .returns<BudgetItem[]>();
 
   const items = sortBudgetItems(budgetData ?? []);
-  const taxableBase = items.reduce((sum, item) => sum + Number(item.total), 0);
-  const vat = taxableBase * VAT_RATE;
-  const total = taxableBase + vat;
+  const { taxableBase, vat, total } = budgetVatTotals(items.reduce((sum, item) => sum + Number(item.total), 0), selectedVat.data);
   const issuedAt = new Date();
   const expiresAt = addDays(issuedAt, 14);
 
@@ -180,7 +180,7 @@ export default async function PrintBudgetPage({ params }: PrintBudgetPageProps) 
           <div className="grid grid-cols-[1fr_auto] gap-y-3 border-b border-[#d8ddd8] pb-3">
             <span className="font-black text-[#58636c]">Base imponible:</span>
             <span className="font-bold">{formatCurrency(taxableBase)}</span>
-            <span className="font-black text-[#58636c]">IVA (21%):</span>
+            <span className="font-black text-[#58636c]">IVA ({selectedVat.data}%):</span>
             <span className="font-bold">{formatCurrency(vat)}</span>
           </div>
           <div className="mt-3 grid grid-cols-[1fr_auto] items-center rounded-sm bg-[#152630] px-4 py-3 text-white">
