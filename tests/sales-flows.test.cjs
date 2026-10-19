@@ -163,3 +163,261 @@ test("issuance creates no receipt until the user explicitly registers it", async
   );
   assert.equal(calls.length, 2);
 });
+
+test("missing company fiscal data is visible before issue and can be completed inline", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(SalesDocumentEditor, {
+      document: doc,
+      payments: [],
+      initialCompany: sales.DEFAULT_COMPANY,
+    }),
+  );
+  assert.match(html, /Faltan datos fiscales para emitir/);
+  assert.match(html, /NIF \/ CIF, dirección fiscal/);
+  assert.match(html, /Completar datos de la empresa/);
+  assert.match(html, /button[^>]*disabled=""[^>]*>[\s\S]*?Emitir/);
+  assert.deepEqual(sales.missingCompanyFields(sales.DEFAULT_COMPANY), [
+    "NIF / CIF",
+    "dirección fiscal",
+  ]);
+  assert.equal(
+    sales.companySchema.safeParse(sales.DEFAULT_COMPANY).success,
+    false,
+  );
+});
+
+function harness(file, name, props, actions) {
+  let cursor = 0;
+  const state = [],
+    navigation = [];
+  const fakeReact = {
+    ...React,
+    useState(initial) {
+      const index = cursor++;
+      if (!(index in state))
+        state[index] = typeof initial === "function" ? initial() : initial;
+      return [
+        state[index],
+        (next) => {
+          state[index] = typeof next === "function" ? next(state[index]) : next;
+        },
+      ];
+    },
+    useRef(initial) {
+      const index = cursor++;
+      if (!(index in state)) state[index] = { current: initial };
+      return state[index];
+    },
+    useEffect() {},
+  };
+  const Component = load(file, {
+    ...mocks,
+    react: fakeReact,
+    "@/actions/salesActions": actions,
+    "next/navigation": {
+      useRouter: () => ({
+        push(path) {
+          navigation.push(path);
+        },
+        replace(path) {
+          navigation.push(path);
+        },
+        refresh() {},
+      }),
+    },
+  })[name];
+  const render = () => {
+    cursor = 0;
+    return Component(props);
+  };
+  function text(node) {
+    if (Array.isArray(node)) return node.map(text).join("");
+    if (typeof node === "string" || typeof node === "number")
+      return String(node);
+    return node ? text(node.props?.children) : "";
+  }
+  function button(tree, label) {
+    if (Array.isArray(tree)) {
+      for (const child of tree) {
+        const result = button(child, label);
+        if (result) return result;
+      }
+      return null;
+    }
+    if (!tree || typeof tree !== "object") return null;
+    if (tree.type === "button" && text(tree) === label) return tree;
+    return button(tree.props?.children, label);
+  }
+  return { render, button, text, navigation };
+}
+const settled = () => new Promise((resolve) => setImmediate(resolve));
+
+test("creation stays locked through slow navigation, including a second click after the action returns", async () => {
+  let creates = 0,
+    release;
+  const h = harness(
+    "components/SalesWorkspace.tsx",
+    "SalesWorkspace",
+    {
+      documents: [],
+      payments: [],
+      projects: [],
+      initialKind: "invoice",
+      available: true,
+    },
+    {
+      createSalesDocumentAction: async () => {
+        creates++;
+        await new Promise((resolve) => {
+          release = resolve;
+        });
+        return { ok: true, id: doc.id };
+      },
+    },
+  );
+  h.button(h.render(), "Nueva factura").props.onClick();
+  const start = h.button(h.render(), "Crear factura en borrador").props.onClick;
+  start();
+  start();
+  assert.equal(creates, 1);
+  release();
+  await settled();
+  const tree = h.render();
+  assert.equal(h.button(tree, "Abriendo borrador…").props.disabled, true);
+  start();
+  await settled();
+  assert.equal(creates, 1);
+  assert.ok(h.navigation.every((path) => path === `/sales/${doc.id}`));
+});
+
+test("an existing draft is reopened instead of creating another document at the same project", async () => {
+  let creates = 0;
+  const h = harness(
+    "components/SalesWorkspace.tsx",
+    "SalesWorkspace",
+    {
+      documents: [doc],
+      payments: [],
+      projects: [],
+      projectId: doc.project_id,
+      initialKind: "invoice",
+      available: true,
+    },
+    {
+      createSalesDocumentAction: async () => {
+        creates++;
+        return { ok: true, id: "other" };
+      },
+    },
+  );
+  h.button(h.render(), "Nueva factura").props.onClick();
+  h.button(h.render(), "Continuar borrador").props.onClick();
+  assert.equal(creates, 0);
+  assert.deepEqual(h.navigation, [`/sales/${doc.id}`]);
+});
+
+test("issue errors remain in the dialog; success immediately locks the draft and opens collections without navigation", async () => {
+  let issues = 0,
+    fail = true;
+  const h = harness(
+    "components/SalesDocumentEditor.tsx",
+    "SalesDocumentEditor",
+    { document: doc, payments: [] },
+    {
+      saveSalesDocumentAction: async () => ({ ok: true }),
+      issueSalesDocumentAction: async () => {
+        issues++;
+        return fail
+          ? { ok: false, error: "Completa los datos fiscales de la empresa." }
+          : { ok: true, number: "F/2026/0001" };
+      },
+    },
+  );
+  h.button(h.render(), "Emitir factura").props.onClick();
+  const confirm = h.button(h.render(), "Confirmar emisión").props.onClick;
+  confirm();
+  confirm();
+  await settled();
+  let tree = h.render();
+  assert.equal(issues, 1);
+  assert.ok(h.button(tree, "Confirmar emisión"));
+  assert.match(h.text(tree), /Completa los datos fiscales/);
+  fail = false;
+  h.button(tree, "Confirmar emisión").props.onClick();
+  await settled();
+  tree = h.render();
+  assert.match(h.text(tree), /Factura emitida. ¿Registrar cobro/);
+  assert.equal(h.button(tree, "Emitir factura"), null);
+  assert.deepEqual(h.navigation, []);
+});
+
+test("an unconfirmed creation cannot be retried until the document list has been checked", async () => {
+  let creates = 0;
+  const h = harness(
+    "components/SalesWorkspace.tsx",
+    "SalesWorkspace",
+    {
+      documents: [],
+      payments: [],
+      projects: [],
+      initialKind: "invoice",
+      available: true,
+    },
+    {
+      createSalesDocumentAction: async () => {
+        creates++;
+        throw new Error("Connection lost after insert");
+      },
+    },
+  );
+  h.button(h.render(), "Nueva factura").props.onClick();
+  h.button(h.render(), "Crear factura en borrador").props.onClick();
+  await settled();
+  const tree = h.render();
+  assert.ok(h.button(tree, "Actualizar lista y comprobar borradores"));
+  assert.equal(h.button(tree, "Abriendo borrador…").props.disabled, true);
+  h.button(tree, "Abriendo borrador…").props.onClick();
+  await settled();
+  assert.equal(creates, 1);
+});
+
+test("an unconfirmed receipt is locked instead of blindly repeating a potentially saved partial collection", async () => {
+  let receipts = 0;
+  const h = harness(
+    "components/SalesDocumentEditor.tsx",
+    "SalesDocumentEditor",
+    {
+      document: { ...doc, status: "issued", number: "F/2026/0001" },
+      payments: [],
+      initialCollect: true,
+    },
+    {
+      recordSalesPaymentAction: async () => {
+        receipts++;
+        throw new Error("Connection lost after receipt insert");
+      },
+    },
+  );
+  function paymentForm(tree) {
+    if (Array.isArray(tree)) {
+      for (const node of tree) {
+        const found = paymentForm(node);
+        if (found) return found;
+      }
+      return null;
+    }
+    if (!tree || typeof tree !== "object") return null;
+    if (tree.type?.name === "SalesPaymentForm") return tree;
+    return paymentForm(tree.props?.children);
+  }
+  const values = new FormData();
+  values.set("amount", "100");
+  paymentForm(h.render()).props.onSave(values);
+  await settled();
+  const tree = h.render();
+  assert.equal(paymentForm(tree).props.pending, true);
+  assert.ok(h.button(tree, "Actualizar factura y comprobar cobros"));
+  paymentForm(tree).props.onSave(values);
+  await settled();
+  assert.equal(receipts, 1);
+});

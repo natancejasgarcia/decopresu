@@ -65,6 +65,19 @@ export const SALES_LABELS: Record<SalesKind, string> = {
   delivery_note: "Albarán",
   invoice: "Factura",
 };
+export function missingCompanyFields(
+  company: Pick<CompanySettings, "legal_name" | "tax_id" | "address"> | null,
+) {
+  return (
+    [
+      ["legal_name", "nombre fiscal"],
+      ["tax_id", "NIF / CIF"],
+      ["address", "dirección fiscal"],
+    ] as const
+  )
+    .filter(([key]) => !company?.[key]?.trim())
+    .map(([, label]) => label);
+}
 
 const numeric = z.preprocess(
   (v) => (typeof v === "string" ? Number(v.trim().replace(",", ".")) : v),
@@ -159,8 +172,8 @@ export const salesDraftSchema = z
 export type SalesDraftInput = z.infer<typeof salesDraftSchema>;
 export const companySchema = z.object({
   legal_name: z.string().trim().min(1).max(200),
-  tax_id: z.string().trim().max(30),
-  address: z.string().trim().max(400),
+  tax_id: z.string().trim().min(1).max(30),
+  address: z.string().trim().min(1).max(400),
   email: z.union([z.literal(""), z.string().trim().email()]),
   phone: z.string().max(30),
   iban: z.string().trim().max(40),

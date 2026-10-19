@@ -8,9 +8,13 @@ import type { CompanySettings } from "@/lib/sales";
 export function CompanySettingsForm({
   initial,
   available,
+  onSaved,
+  fiscalOnly = false,
 }: {
   initial: CompanySettings;
   available: boolean;
+  onSaved?: (settings: CompanySettings) => void;
+  fiscalOnly?: boolean;
 }) {
   const [settings, setSettings] = useState(initial);
   const [pending, startTransition] = useAsyncTask();
@@ -42,6 +46,7 @@ export function CompanySettingsForm({
             setMessage(
               result.ok ? "Datos de empresa guardados." : result.error,
             );
+            if (result.ok) onSaved?.(settings);
           } catch {
             setError(true);
             setMessage("No se pudo guardar. Vuelve a intentarlo.");
@@ -59,29 +64,36 @@ export function CompanySettingsForm({
         disabled={pending || !available}
         className="grid min-w-0 gap-4 sm:grid-cols-2"
       >
-        {fields.map((field) => (
-          <label
-            key={field.key}
-            className={field.key === "address" ? "sm:col-span-2" : ""}
-          >
-            <span className="form-label">{field.label}</span>
-            <input
-              className="form-input"
-              type={field.type ?? "text"}
-              value={settings[field.key]}
-              onChange={(e) =>
-                setSettings((v) => ({ ...v, [field.key]: e.target.value }))
-              }
-              required={
-                field.key === "legal_name" || field.key.endsWith("series")
-              }
-              pattern={
-                field.key.endsWith("series") ? "[A-Z0-9]{1,8}" : undefined
-              }
-              maxLength={field.key.endsWith("series") ? 8 : 400}
-            />
-          </label>
-        ))}
+        {fields
+          .filter(
+            (field) =>
+              !fiscalOnly ||
+              ["legal_name", "tax_id", "address"].includes(field.key),
+          )
+          .map((field) => (
+            <label
+              key={field.key}
+              className={field.key === "address" ? "sm:col-span-2" : ""}
+            >
+              <span className="form-label">{field.label}</span>
+              <input
+                className="form-input"
+                type={field.type ?? "text"}
+                value={settings[field.key]}
+                onChange={(e) =>
+                  setSettings((v) => ({ ...v, [field.key]: e.target.value }))
+                }
+                required={
+                  ["legal_name", "tax_id", "address"].includes(field.key) ||
+                  field.key.endsWith("series")
+                }
+                pattern={
+                  field.key.endsWith("series") ? "[A-Z0-9]{1,8}" : undefined
+                }
+                maxLength={field.key.endsWith("series") ? 8 : 400}
+              />
+            </label>
+          ))}
       </fieldset>
       {message && (
         <p

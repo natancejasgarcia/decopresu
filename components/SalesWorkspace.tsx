@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAsyncTask } from "@/lib/useAsyncTask";
 import {
   ArrowRight,
@@ -49,6 +49,19 @@ export function SalesWorkspace({
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
   const [invoiceMode, setInvoiceMode] = useState<"full" | "partial">("full");
+  const createdIdRef = useRef<string | null>(null);
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const [forceNewDraft, setForceNewDraft] = useState(false);
+  const [creationUncertain, setCreationUncertain] = useState(false);
+  const existingDraft = documents.find(
+    (document) =>
+      document.status === "draft" &&
+      document.kind === kind &&
+      (document.project_id ?? "") === selectedProject,
+  );
+  const opening = pending || !!createdId || creationUncertain;
+  const documentUrl = (id: string) =>
+    `/sales/${id}${kind === "invoice" && invoiceMode === "partial" ? "?partial=1" : ""}`;
   const today = todayMadrid();
   const scopedDocuments = documents.filter(
     (d) => !projectId || d.project_id === projectId,
@@ -85,6 +98,17 @@ export function SalesWorkspace({
     );
   });
   function create() {
+    if (creationUncertain) return;
+    if (createdIdRef.current) {
+      router.push(documentUrl(createdIdRef.current));
+      return;
+    }
+    if (existingDraft && !forceNewDraft) {
+      createdIdRef.current = existingDraft.id;
+      setCreatedId(existingDraft.id);
+      router.push(`/sales/${existingDraft.id}`);
+      return;
+    }
     setError("");
     startTransition(async () => {
       try {
@@ -96,11 +120,21 @@ export function SalesWorkspace({
           setError(result.error);
           return;
         }
-        router.push(
-          `/sales/${result.id}${kind === "invoice" && invoiceMode === "partial" ? "?partial=1" : ""}`,
-        );
+        if (!result.id) {
+          setCreationUncertain(true);
+          setError(
+            "No se pudo confirmar el borrador. Actualiza la lista antes de crear otro.",
+          );
+          return;
+        }
+        createdIdRef.current = result.id;
+        setCreatedId(result.id);
+        router.push(documentUrl(result.id));
       } catch {
-        setError("No se pudo conectar. Vuelve a intentarlo.");
+        setCreationUncertain(true);
+        setError(
+          "No se pudo confirmar la creación. Actualiza la lista para comprobar si el borrador quedó guardado antes de repetirla.",
+        );
       }
     });
   }
@@ -152,15 +186,20 @@ export function SalesWorkspace({
         role="tablist"
         aria-label="Tipo de documento"
       >
-        {(["delivery_note", "invoice"] as const).map((k) => (
+        {(["invoice", "delivery_note"] as const).map((k) => (
           <button
             key={k}
             role="tab"
             aria-selected={kind === k}
+            disabled={opening}
             className={kind === k ? "action-primary" : "action-secondary"}
             onClick={() => {
               setKind(k);
               setFilter("all");
+              router.replace(
+                `/sales?kind=${k}${projectId ? `&project=${projectId}` : ""}`,
+                { scroll: false },
+              );
             }}
             type="button"
           >
@@ -231,7 +270,15 @@ export function SalesWorkspace({
             <button
               type="button"
               className="action-primary"
-              onClick={() => setCreating(!creating)}
+              disabled={opening}
+              onClick={() => {
+                if (!creating) {
+                  createdIdRef.current = null;
+                  setCreatedId(null);
+                  setForceNewDraft(false);
+                }
+                setCreating(!creating);
+              }}
             >
               <FilePlus2 size={20} />
               {kind === "invoice" ? "Nueva factura" : "Nuevo albarán"}
@@ -244,7 +291,11 @@ export function SalesWorkspace({
                 <select
                   className="form-input"
                   value={selectedProject}
-                  onChange={(e) => setSelectedProject(e.target.value)}
+                  disabled={opening}
+                  onChange={(e) => {
+                    setSelectedProject(e.target.value);
+                    setForceNewDraft(false);
+                  }}
                 >
                   <option value="">Sin obra: documento vacío</option>
                   {projects.map((p) => (
@@ -257,7 +308,7 @@ export function SalesWorkspace({
               {kind === "invoice" && (
                 <fieldset
                   className="flex min-w-0 flex-wrap gap-4 sm:col-span-2 sm:row-start-1"
-                  disabled={pending}
+                  disabled={opening}
                 >
                   <legend className="form-label mb-2">Tipo de factura</legend>
                   <label className="flex min-h-11 items-center gap-2">
@@ -282,13 +333,50 @@ export function SalesWorkspace({
                   </label>
                 </fieldset>
               )}
+              {existingDraft && !createdId && (
+                <div className="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <p className="font-semibold">
+                    Ya hay un{" "}
+                    {kind === "invoice"
+                      ? "borrador de factura"
+                      : "albarán en borrador"}{" "}
+                    {selectedProject ? "de esta obra" : "sin obra"}.
+                  </p>
+                  <label className="mt-2 flex min-h-11 items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={forceNewDraft}
+                      disabled={opening}
+                      onChange={(event) =>
+                        setForceNewDraft(event.target.checked)
+                      }
+                    />
+                    Crear otro documento distinto
+                  </label>
+                </div>
+              )}
+              {createdId && (
+                <p className="sm:col-span-2 feedback-success" role="status">
+                  Borrador preparado.{" "}
+                  <Link
+                    className="font-bold underline"
+                    href={documentUrl(createdId)}
+                  >
+                    Abrir borrador
+                  </Link>
+                </p>
+              )}
               <button
                 type="button"
                 className="action-primary self-end"
-                disabled={pending}
+                disabled={opening}
                 onClick={create}
               >
-                {pending ? "Preparando…" : "Crear borrador"}
+                {opening
+                  ? "Abriendo borrador…"
+                  : existingDraft && !forceNewDraft
+                    ? "Continuar borrador"
+                    : `Crear ${kind === "invoice" ? "factura" : "albarán"} en borrador`}
                 <ArrowRight size={20} />
               </button>
             </div>
@@ -297,6 +385,15 @@ export function SalesWorkspace({
             <p className="feedback-error" role="alert">
               {error}
             </p>
+          )}
+          {creationUncertain && (
+            <button
+              className="action-secondary"
+              type="button"
+              onClick={() => window.location.reload()}
+            >
+              Actualizar lista y comprobar borradores
+            </button>
           )}
           <div className="grid gap-3">
             {matches.length === 0 ? (

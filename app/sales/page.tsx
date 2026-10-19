@@ -46,11 +46,12 @@ export default async function SalesPage({
       <TopBar profile={profile} />
       <div className="mx-auto max-w-6xl px-4 py-6">
         <SalesWorkspace
+          key={`${searchParams.project ?? "all"}-${searchParams.kind ?? "invoice"}`}
           documents={docs ?? []}
           payments={payments ?? []}
           projects={projects ?? []}
           initialKind={
-            searchParams.kind === "invoice" ? "invoice" : "delivery_note"
+            searchParams.kind === "delivery_note" ? "delivery_note" : "invoice"
           }
           projectId={searchParams.project}
           available={!error && !paymentError}

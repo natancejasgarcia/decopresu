@@ -25,6 +25,7 @@ import {
 import {
   displayDay,
   documentBalance,
+  missingCompanyFields,
   roundAmount,
   SALES_LABELS,
   salesTotals,
@@ -32,10 +33,12 @@ import {
   type SalesDraftInput,
   type SalesLine,
   type SalesPayment,
+  type CompanySettings,
 } from "@/lib/sales";
 import { formatCurrency } from "@/lib/calculations";
 import { SalesPartialInvoiceForm } from "@/components/SalesPartialInvoiceForm";
 import { SalesPaymentForm } from "@/components/SalesPaymentForm";
+import { CompanySettingsForm } from "@/components/CompanySettingsForm";
 
 function inputFrom(doc: SalesDocument): SalesDraftInput {
   return {
@@ -50,19 +53,34 @@ function inputFrom(doc: SalesDocument): SalesDraftInput {
   };
 }
 export function SalesDocumentEditor({
-  document,
+  document: initialDocument,
   payments,
   linkedInvoiceId,
   initialPartial = false,
   initialCollect = false,
+  initialCompany,
 }: {
   document: SalesDocument;
   payments: SalesPayment[];
   linkedInvoiceId?: string;
   initialPartial?: boolean;
   initialCollect?: boolean;
+  initialCompany?: CompanySettings;
 }) {
   const router = useRouter();
+  const [issuedDocument, setIssuedDocument] = useState<SalesDocument | null>(
+    null,
+  );
+  const document =
+    initialDocument.status === "issued"
+      ? initialDocument
+      : (issuedDocument ?? initialDocument);
+  const [savedCompany, setSavedCompany] = useState<CompanySettings | null>(
+    null,
+  );
+  const company = savedCompany ?? initialCompany;
+  const companyMissing = company ? missingCompanyFields(company) : [];
+  const [paymentUncertain, setPaymentUncertain] = useState(false);
   const [input, setInput] = useState(() => inputFrom(document));
   const [pending, startTransition] = useAsyncTask();
   const [downloading, setDownloading] = useState(false);
@@ -167,7 +185,7 @@ export function SalesDocumentEditor({
       }
     });
   }
-  async function save() {
+  async function save(refreshAfter = true) {
     if (partialOpen) {
       setFeedback({
         error: true,
@@ -182,7 +200,7 @@ export function SalesDocumentEditor({
     }
     setDirty(false);
     setFeedback({ error: false, text: "Borrador guardado." });
-    router.refresh();
+    if (refreshAfter) router.refresh();
     return true;
   }
   function confirmAction() {
@@ -197,25 +215,33 @@ export function SalesDocumentEditor({
         router.push(`/sales?kind=${document.kind}`);
         return;
       }
-      if (!(await save())) {
-        setConfirm(null);
+      if (!(await save(false))) {
         return;
       }
       const result = await issueSalesDocumentAction(document.id);
-      setConfirm(null);
       if (!result.ok) {
         setFeedback({ error: true, text: result.error });
         return;
       }
+      setIssuedDocument({
+        ...document,
+        ...input,
+        due_date: input.due_date || null,
+        status: "issued",
+        number: result.number ?? document.number,
+        subtotal: totals.subtotal,
+        tax_total: totals.tax,
+        total: totals.total,
+      });
+      setDirty(false);
+      setConfirm(
+        document.kind === "invoice" && totals.total > 0 ? "collect" : null,
+      );
       setFeedback({
         error: false,
-        text: `${title} emitido: ${result.number}.`,
+        text: `${document.kind === "invoice" ? "Factura emitida" : "Albarán emitido"}: ${result.number}.`,
       });
-      if (document.kind === "invoice" && totals.total > 0) {
-        router.replace(`/sales/${document.id}?collect=1`, { scroll: false });
-      } else {
-        router.refresh();
-      }
+      router.refresh();
     });
   }
   function closeCollection() {
@@ -224,8 +250,19 @@ export function SalesDocumentEditor({
     router.replace(`/sales/${document.id}`, { scroll: false });
   }
   function savePayment(values: FormData) {
+    if (paymentUncertain) return;
     run(async () => {
-      const result = await recordSalesPaymentAction(document.id, values);
+      let result;
+      try {
+        result = await recordSalesPaymentAction(document.id, values);
+      } catch {
+        setPaymentUncertain(true);
+        setFeedback({
+          error: true,
+          text: "No se pudo confirmar el cobro. Actualiza la factura para comprobar si quedó guardado antes de repetirlo.",
+        });
+        return;
+      }
       if (!result.ok) {
         setFeedback({ error: true, text: result.error });
         return;
@@ -312,7 +349,11 @@ export function SalesDocumentEditor({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-sm text-muted">
-            {readonly ? "Documento emitido" : "Borrador"}
+            {readonly
+              ? document.kind === "invoice"
+                ? "Factura emitida"
+                : "Albarán emitido"
+              : `${title} en borrador`}
           </p>
           <h1 className="text-3xl font-bold">
             {document.number ??
@@ -392,6 +433,40 @@ export function SalesDocumentEditor({
         >
           {feedback.text}
         </p>
+      )}
+      {paymentUncertain && !confirm && (
+        <button
+          type="button"
+          className="action-secondary"
+          onClick={() => window.location.reload()}
+        >
+          Actualizar factura y comprobar cobros
+        </button>
+      )}
+      {!readonly && company && companyMissing.length > 0 && (
+        <section
+          className="rounded-lg border border-amber-300 bg-amber-50 p-4"
+          role="alert"
+        >
+          <h2 className="text-xl font-bold">
+            Faltan datos fiscales para emitir
+          </h2>
+          <p className="mt-2">
+            Completa {companyMissing.join(", ")}. El documento sigue en
+            borrador; todavía no se ha emitido ni registrado ningún cobro.
+          </p>
+          <details className="mt-3">
+            <summary className="min-h-11 cursor-pointer py-2 font-bold">
+              Completar datos de la empresa
+            </summary>
+            <CompanySettingsForm
+              initial={company}
+              available
+              fiscalOnly
+              onSaved={setSavedCompany}
+            />
+          </details>
+        </section>
       )}
       {!readonly &&
         document.kind === "invoice" &&
@@ -660,8 +735,16 @@ export function SalesDocumentEditor({
             <button
               className="action-primary"
               type="button"
-              disabled={pending || input.lines.length === 0 || partialOpen}
-              onClick={() => setConfirm("issue")}
+              disabled={
+                pending ||
+                input.lines.length === 0 ||
+                partialOpen ||
+                companyMissing.length > 0
+              }
+              onClick={() => {
+                setFeedback(null);
+                setConfirm("issue");
+              }}
             >
               <Check size={20} />
               Emitir {title.toLocaleLowerCase("es")}
@@ -669,6 +752,12 @@ export function SalesDocumentEditor({
             {dirty && (
               <p className="w-full text-sm text-amber-800" role="status">
                 Hay cambios sin guardar.
+              </p>
+            )}
+            {companyMissing.length > 0 && (
+              <p className="w-full font-semibold text-amber-900">
+                No se puede emitir: faltan {companyMissing.join(", ")} de la
+                empresa.
               </p>
             )}
           </div>
@@ -711,7 +800,7 @@ export function SalesDocumentEditor({
               key={balance.outstanding}
               outstanding={balance.outstanding}
               issueDate={document.issue_date}
-              pending={pending}
+              pending={pending || paymentUncertain}
               onSave={savePayment}
               onCancel={closeCollection}
             />
@@ -786,17 +875,36 @@ export function SalesDocumentEditor({
                 está pendiente.
               </p>
             )}
+            {feedback?.error && (
+              <div className="mt-3" role="alert">
+                <p className="feedback-error">{feedback.text}</p>
+                {confirm === "issue" &&
+                  (feedback.text.includes("empresa") ||
+                    feedback.text.includes("Ajustes")) && (
+                    <Link
+                      href="/settings"
+                      className="mt-3 inline-flex min-h-11 items-center font-bold text-moss underline"
+                    >
+                      Revisar datos fiscales de la empresa
+                    </Link>
+                  )}
+              </div>
+            )}
+            {paymentUncertain && (
+              <button
+                type="button"
+                className="action-secondary mt-3"
+                onClick={() => window.location.reload()}
+              >
+                Actualizar factura y comprobar cobros
+              </button>
+            )}
             {confirm === "collect" ? (
               <>
-                {feedback?.error && (
-                  <p className="feedback-error mt-3" role="alert">
-                    {feedback.text}
-                  </p>
-                )}
                 <SalesPaymentForm
                   outstanding={balance.outstanding}
                   issueDate={document.issue_date}
-                  pending={pending}
+                  pending={pending || paymentUncertain}
                   onSave={savePayment}
                   onCancel={closeCollection}
                 />

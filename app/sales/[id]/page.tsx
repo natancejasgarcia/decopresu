@@ -3,7 +3,12 @@ import { z } from "zod";
 import { TopBar } from "@/components/TopBar";
 import { SalesDocumentEditor } from "@/components/SalesDocumentEditor";
 import { requireUserProfile } from "@/lib/auth";
-import type { SalesDocument, SalesPayment } from "@/lib/sales";
+import {
+  DEFAULT_COMPANY,
+  type CompanySettings,
+  type SalesDocument,
+  type SalesPayment,
+} from "@/lib/sales";
 
 export const dynamic = "force-dynamic";
 export default async function SalesDocumentPage({
@@ -19,6 +24,7 @@ export default async function SalesDocumentPage({
     { data: document, error },
     { data: payments, error: paymentError },
     { data: invoice, error: invoiceError },
+    { data: company, error: companyError },
   ] = await Promise.all([
     supabase
       .from("sales_documents")
@@ -37,8 +43,13 @@ export default async function SalesDocumentPage({
       .eq("source_document_id", params.id)
       .eq("kind", "invoice")
       .maybeSingle<{ id: string }>(),
+    supabase
+      .from("company_settings")
+      .select("*")
+      .eq("id", 1)
+      .maybeSingle<CompanySettings>(),
   ]);
-  if (error || paymentError || invoiceError)
+  if (error || paymentError || invoiceError || companyError)
     throw new Error("No se pudo cargar el documento.");
   if (!document) notFound();
   return (
@@ -46,12 +57,13 @@ export default async function SalesDocumentPage({
       <TopBar profile={profile} />
       <div className="mx-auto max-w-5xl px-4 py-6">
         <SalesDocumentEditor
-          key={`${document.id}-${document.status}`}
+          key={document.id}
           document={document}
           payments={payments ?? []}
           linkedInvoiceId={invoice?.id}
           initialPartial={searchParams.partial === "1"}
           initialCollect={searchParams.collect === "1"}
+          initialCompany={company ?? DEFAULT_COMPANY}
         />
       </div>
     </main>
