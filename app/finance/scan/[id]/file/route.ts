@@ -19,7 +19,9 @@ export async function GET(
   const { data } = await query.single();
   if (
     !data ||
-    !["image/jpeg", "image/png", "image/webp"].includes(data.file_type)
+    !["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(
+      data.file_type,
+    )
   )
     return new Response("No disponible", { status: 404 });
   const file = await supabase.storage

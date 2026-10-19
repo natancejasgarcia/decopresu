@@ -19,9 +19,15 @@ export async function preparePrivateUpload(input: unknown) {
       return {
         error: "Falta activar los permisos para subir facturas en Supabase.",
       };
+    if (file.type === "application/pdf") {
+      const pdfReady = await supabase.rpc("reviewer_invoice_pdfs_ready");
+      if (pdfReady.error || pdfReady.data !== true)
+        return {
+          error:
+            "Falta activar la migracion 20261020_finance_pdf_uploads.sql para que Decoralia pueda subir PDF.",
+        };
+    }
   }
-  if (file.folder === "finance-scans" && file.type === "application/pdf")
-    return { error: "El escaner admite fotos JPG, PNG o WebP." };
   const extension =
     file.type === "application/pdf" ? "pdf" : file.type.split("/")[1];
   const path = `${file.folder}/${user.id}/${crypto.randomUUID()}.${extension}`;

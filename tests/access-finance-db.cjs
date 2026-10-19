@@ -54,6 +54,12 @@ async function main() {
     );
     await db.exec(uploadMigration);
     await db.exec(uploadMigration);
+    const pdfMigration = fs.readFileSync(
+      "supabase/migrations/20261020_finance_pdf_uploads.sql",
+      "utf8",
+    );
+    await db.exec(pdfMigration);
+    await db.exec(pdfMigration);
     async function login(id, email) {
       await db.exec(
         `reset role;select set_config('request.jwt.claim.sub','${id}',false);select set_config('request.jwt.claim.email','${email}',false);set role authenticated;`,
@@ -233,7 +239,7 @@ async function main() {
       party_name: "Proveedor",
       tax_id: "B1",
       invoice_number: "F1",
-      issue_date: "2026-10-18",
+      issue_date: "2026-09-30",
       currency: "EUR",
       subtotal: 100,
       tax: 21,
@@ -276,6 +282,15 @@ async function main() {
     await db.query("select post_finance_document($1,$2)", [d.id, invoice]);
     await db.query("select post_finance_document($1,$2)", [d.id, invoice]);
     assert.equal(
+      (
+        await one(
+          "select expense_date::text as recorded_date from project_expenses",
+        )
+      ).recorded_date,
+      "2026-09-30",
+      "expense belongs to invoice month, not upload month",
+    );
+    assert.equal(
       (await one("select count(*)::int n from project_expenses")).n,
       1,
     );
@@ -316,6 +331,15 @@ async function main() {
       Number((await one("select amount from project_payments")).amount),
       47.7,
     );
+    assert.equal(
+      (
+        await one(
+          "select payment_date::text as recorded_date from project_payments",
+        )
+      ).recorded_date,
+      "2026-10-18",
+      "actual receipt belongs to payment month, not invoice month",
+    );
     d = await draft();
     await db.query("select post_finance_document($1,$2)", [
       d.id,
@@ -344,6 +368,32 @@ async function main() {
       (await db.query("select * from finance_documents")).rows.length,
       0,
       "reviewer cannot see owner documents or posted uploads",
+    );
+    const pdfPath = `finance-scans/${reviewer}/00000000-0000-0000-0000-000000000098.pdf`;
+    await db.query(
+      "insert into storage.objects(bucket_id,name) values('project-files',$1)",
+      [pdfPath],
+    );
+    await db.query(
+      "insert into finance_documents(created_by,file_path,file_name,file_type,file_size,file_hash) values($1,$2,'Subida.pdf','application/pdf',10,$3)",
+      [reviewer, pdfPath, "c".repeat(64)],
+    );
+    assert.equal(
+      (await one("select reviewer_invoice_pdfs_ready() ready")).ready,
+      true,
+    );
+    assert.equal(
+      (await db.query("select * from finance_documents")).rows.length,
+      1,
+      "reviewer sees only their own pending PDF",
+    );
+    await assert.rejects(
+      () =>
+        db.query(
+          "insert into storage.objects(bucket_id,name) values('project-files',$1)",
+          [`finance-scans/${owner}/00000000-0000-0000-0000-000000000098.pdf`],
+        ),
+      /row-level security/,
     );
     console.log(
       "OK: migration twice; reviewer isolation; private PDFs; OK transitions; owner-only history; invoice posting atomic/idempotent; duplicate rollback; partial/unpaid receipts; existing costs preserved.",

@@ -3,12 +3,13 @@ import { TopBar } from "@/components/TopBar";
 import { InvoiceScanner } from "@/components/InvoiceScanner";
 import { requireUserProfile } from "@/lib/auth";
 import type { FinanceDocument } from "@/lib/financeDocuments";
+import { invoiceMonthRange } from "@/lib/financeDocuments";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 export default async function ScanPage({
   searchParams,
 }: {
-  searchParams: { page?: string; status?: string };
+  searchParams: { page?: string; status?: string; month?: string };
 }) {
   const { supabase, profile, user } = await requireUserProfile("uploads");
   const reviewer = profile.access_role === "reviewer";
@@ -36,18 +37,27 @@ export default async function ScanPage({
   );
   const status =
     !reviewer && searchParams.status === "posted" ? "posted" : "draft";
+  const period =
+    !reviewer && status === "posted"
+      ? invoiceMonthRange(searchParams.month)
+      : null;
+  const periodQuery = period ? `&month=${period.key}` : "";
   let query = supabase
     .from("finance_documents")
     .select(
       reviewer
-        ? "id,file_name,status,created_at"
-        : "id,file_name,status,extracted,invoice_data,created_at",
+        ? "id,file_name,file_type,status,created_at"
+        : "id,file_name,file_type,status,extracted,invoice_data,created_at",
       {
         count: "exact",
       },
     )
     .eq("status", status);
   if (reviewer) query = query.eq("created_by", user.id);
+  if (period)
+    query = query
+      .gte("invoice_data->>issue_date", period.start)
+      .lt("invoice_data->>issue_date", period.end);
   const documents = await query
     .order("created_at", { ascending: false })
     .range((page - 1) * 25, page * 25 - 1)
@@ -81,9 +91,32 @@ export default async function ScanPage({
           <>
             {!reviewer && !process.env.OPENAI_API_KEY && (
               <p role="alert" className="text-amber-800">
-                Falta configurar OPENAI_API_KEY para leer las fotos. Puedes
+                Falta configurar OPENAI_API_KEY para leer PDF y fotos. Puedes
                 guardar los datos manualmente.
               </p>
+            )}
+            {!reviewer && status === "posted" && (
+              <form className="flex flex-wrap items-end gap-3">
+                <input type="hidden" name="status" value="posted" />
+                <label className="min-w-0 font-bold">
+                  Mes de factura
+                  <input
+                    type="month"
+                    name="month"
+                    defaultValue={period?.key ?? ""}
+                    className="form-input mt-1"
+                  />
+                </label>
+                <button className="min-h-12 rounded-lg bg-moss px-4 font-bold text-white">
+                  Ver mes
+                </button>
+                <Link
+                  href="/finance/scan?status=posted"
+                  className="flex min-h-12 items-center px-2 font-bold text-moss underline"
+                >
+                  Todos los meses
+                </Link>
+              </form>
             )}
             {!reviewer && (
               <nav aria-label="Facturas" className="flex gap-4">
@@ -113,14 +146,18 @@ export default async function ScanPage({
             />
             <nav aria-label="Paginas" className="flex justify-between">
               {page > 1 ? (
-                <Link href={`/finance/scan?status=${status}&page=${page - 1}`}>
+                <Link
+                  href={`/finance/scan?status=${status}${periodQuery}&page=${page - 1}`}
+                >
                   Anterior
                 </Link>
               ) : (
                 <span />
               )}
               {page * 25 < (documents.count ?? 0) && (
-                <Link href={`/finance/scan?status=${status}&page=${page + 1}`}>
+                <Link
+                  href={`/finance/scan?status=${status}${periodQuery}&page=${page + 1}`}
+                >
                   Siguiente
                 </Link>
               )}

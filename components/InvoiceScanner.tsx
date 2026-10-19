@@ -1,7 +1,15 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Camera, Check, ScanLine, Trash2, Upload } from "lucide-react";
+import {
+  Camera,
+  Check,
+  FileText,
+  ScanLine,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import {
   postFinanceDocument,
   deleteFinanceDraft,
@@ -13,6 +21,7 @@ import { useAsyncTask } from "@/lib/useAsyncTask";
 import type { FinanceDocument } from "@/lib/financeDocuments";
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS } from "@/lib/types";
 type ProjectOption = { id: string; name: string };
+type PostedPeriod = { invoiceMonth: string; financeMonth: string | null };
 
 export function InvoiceScanner({
   documents,
@@ -27,12 +36,13 @@ export function InvoiceScanner({
 }) {
   const [pending, run] = useAsyncTask();
   const [messages, setMessages] = useState<string[]>([]);
+  const [postedPeriod, setPostedPeriod] = useState<PostedPeriod | null>(null);
   const router = useRouter();
   function upload(files: File[]) {
     void run(async () => {
       setMessages([]);
       if (files.length > 10) {
-        setMessages(["Selecciona como maximo 10 fotos cada vez."]);
+        setMessages(["Selecciona como maximo 10 archivos cada vez."]);
         return;
       }
       for (const file of files) {
@@ -45,7 +55,7 @@ export function InvoiceScanner({
             const scan = await scanFinancePhoto(registered.id);
             if (scan.error)
               throw new Error(
-                `${scan.error} La foto queda guardada para revisar.`,
+                `${scan.error} El archivo queda guardado para revisar.`,
               );
           }
           setMessages((m) => [
@@ -71,11 +81,11 @@ export function InvoiceScanner({
           className={`inline-flex min-h-12 cursor-pointer items-center gap-2 rounded-lg bg-moss px-4 font-bold text-white ${pending ? "opacity-60" : ""}`}
         >
           <Upload size={20} />
-          {pending ? "Procesando..." : "Subir fotos"}
+          {pending ? "Procesando..." : "Subir PDF o fotos"}
           <input
             disabled={pending}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="application/pdf,image/jpeg,image/png,image/webp"
             multiple
             className="sr-only"
             onChange={(e) => {
@@ -100,6 +110,34 @@ export function InvoiceScanner({
           />
         </label>
       </div>
+      {postedPeriod && (
+        <p
+          role="status"
+          className="rounded-lg bg-emerald-50 p-3 font-semibold text-emerald-900"
+        >
+          Factura contabilizada.{" "}
+          <Link
+            className="underline"
+            href={`/finance/scan?status=posted&month=${postedPeriod.invoiceMonth}`}
+          >
+            Ver facturas de {postedPeriod.invoiceMonth.slice(5)}/
+            {postedPeriod.invoiceMonth.slice(0, 4)}
+          </Link>
+          {postedPeriod.financeMonth && (
+            <>
+              {" "}
+              ·{" "}
+              <Link
+                className="underline"
+                href={`/finance?month=${postedPeriod.financeMonth}`}
+              >
+                Ver Finanzas de {postedPeriod.financeMonth.slice(5)}/
+                {postedPeriod.financeMonth.slice(0, 4)}
+              </Link>
+            </>
+          )}
+        </p>
+      )}
       <div
         role="status"
         aria-live="polite"
@@ -130,7 +168,7 @@ export function InvoiceScanner({
                 rel="noreferrer"
                 className="inline-flex min-h-12 items-center rounded-lg border border-line px-4 font-bold text-moss"
               >
-                Ver foto
+                Ver archivo
               </a>
             </article>
           ))
@@ -140,6 +178,7 @@ export function InvoiceScanner({
               document={document}
               projects={projects}
               aiReady={aiReady}
+              onPosted={setPostedPeriod}
             />
           ))}
     </div>
@@ -150,10 +189,12 @@ function InvoiceCard({
   document,
   projects,
   aiReady,
+  onPosted,
 }: {
   document: FinanceDocument;
   projects: ProjectOption[];
   aiReady: boolean;
+  onPosted: (period: PostedPeriod) => void;
 }) {
   const [extracted, setExtracted] = useState(document.extracted);
   const [pending, run] = useAsyncTask();
@@ -172,6 +213,7 @@ function InvoiceCard({
     ["tax_id", "NIF / CIF"],
     ["invoice_number", "Numero de factura"],
     ["issue_date", "Fecha de factura"],
+    ["due_date", "Vencimiento (opcional)"],
     ["concept", "Concepto"],
     ["currency", "Moneda"],
     ["subtotal", "Base imponible"],
@@ -191,6 +233,11 @@ function InvoiceCard({
         <span className="ml-2 text-sm text-muted">
           {posted ? "Contabilizada" : "Por revisar"}
         </span>
+        {/^\d{4}-\d{2}-\d{2}$/.test(text("issue_date")) && (
+          <span className="ml-2 text-sm font-normal text-muted">
+            {text("issue_date").split("-").reverse().join("/")}
+          </span>
+        )}
       </summary>
       <div className="mt-4 grid gap-5 lg:grid-cols-[240px_1fr]">
         <div>
@@ -203,11 +250,25 @@ function InvoiceCard({
             Ver original
           </a>
           {/* Private images are served through the authenticated route. */}
-          <img
-            src={`/finance/scan/${document.id}/file`}
-            alt="Factura original"
-            className="mt-3 max-h-80 w-full rounded border border-line object-contain"
-          />
+          {document.file_type === "application/pdf" ? (
+            <a
+              href={`/finance/scan/${document.id}/file`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 flex min-h-36 flex-col items-center justify-center gap-3 rounded-lg border border-line bg-white p-4 text-moss"
+            >
+              <FileText size={40} aria-hidden="true" />
+              <span className="max-w-full break-words text-center font-bold">
+                Abrir PDF
+              </span>
+            </a>
+          ) : (
+            <img
+              src={`/finance/scan/${document.id}/file`}
+              alt="Factura original"
+              className="mt-3 max-h-80 w-full rounded border border-line object-contain"
+            />
+          )}
           {!posted && (
             <button
               disabled={pending || !aiReady}
@@ -237,7 +298,8 @@ function InvoiceCard({
               type="button"
               disabled={pending}
               onClick={() => {
-                if (!window.confirm("Borrar este borrador y su foto?")) return;
+                if (!window.confirm("Borrar este borrador y su archivo?"))
+                  return;
                 void run(async () => {
                   setError("");
                   try {
@@ -270,6 +332,7 @@ function InvoiceCard({
               ...data,
               project_id: data.project_id || null,
               payment_date: data.payment_date || null,
+              due_date: data.due_date || null,
               ...Object.fromEntries(
                 ["subtotal", "tax", "total", "paid_amount"].map((key) => [
                   key,
@@ -282,8 +345,13 @@ function InvoiceCard({
               try {
                 const result = await postFinanceDocument(document.id, value);
                 if (result.error) throw new Error(result.error);
-                setSaved(value);
+                setSaved(result.invoice ?? value);
                 setPosted(true);
+                onPosted({
+                  invoiceMonth:
+                    result.invoiceMonth ?? String(data.issue_date).slice(0, 7),
+                  financeMonth: result.financeMonth ?? null,
+                });
                 router.refresh();
               } catch (e) {
                 setError(
@@ -293,16 +361,18 @@ function InvoiceCard({
             });
           }}
         >
-          {Array.isArray(extracted.warnings) && !posted && (
-            <div
-              role="status"
-              className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 sm:col-span-2"
-            >
-              {extracted.warnings.map((warning, i) => (
-                <p key={i}>{String(warning)}</p>
-              ))}
-            </div>
-          )}
+          {Array.isArray(extracted.warnings) &&
+            extracted.warnings.length > 0 &&
+            !posted && (
+              <div
+                role="status"
+                className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 sm:col-span-2"
+              >
+                {extracted.warnings.map((warning, i) => (
+                  <p key={i}>{String(warning)}</p>
+                ))}
+              </div>
+            )}
           <label className="font-bold">
             Tipo
             <select
@@ -343,7 +413,12 @@ function InvoiceCard({
                 name={name}
                 disabled={posted}
                 required={
-                  !["tax_id", "invoice_number", "payment_date"].includes(name)
+                  ![
+                    "tax_id",
+                    "invoice_number",
+                    "payment_date",
+                    "due_date",
+                  ].includes(name)
                 }
                 type={name.includes("date") ? "date" : "text"}
                 inputMode={
