@@ -3,6 +3,7 @@ import { BarChart3, Banknote, CreditCard, Euro, ReceiptText, Trash2, TrendingDow
 import { createFixedCostAction, createPaymentFormAction, deleteExpenseAction, deleteFixedCostAction, deletePaymentAction } from "@/actions/financeActions";
 import { ExpenseForm } from "@/components/ExpenseForm";
 import { FinanceAssistant } from "@/components/FinanceAssistant";
+import { MonthlyFinanceList } from "@/components/MonthlyFinanceList";
 import { formatCurrency } from "@/lib/calculations";
 import { buildDailyFinanceSeries, buildMonthlyFinance, monthLabel, monthlyFixedCostAmount } from "@/lib/finance";
 import {
@@ -268,33 +269,45 @@ export function FinanceDashboard({ projects, budgetItems, expenses, payments, fi
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <DataPanel title="Ultimos gastos">
-          {finance.monthExpenses.length === 0 ? <Empty text="No hay gastos este mes." /> : finance.monthExpenses.slice(0, 8).map((expense) => (
-            <FinanceRow
-              key={expense.id}
-              title={expense.concept}
-              meta={`${expense.category} - ${projectNames.get(expense.project_id ?? "") ?? "General"} - ${expense.expense_date}`}
-              amount={Number(expense.amount)}
-              deleteAction={deleteExpenseAction}
-              hiddenInputs={{ expense_id: expense.id, project_id: expense.project_id ?? "" }}
-              receiptName={expense.receipt_file_name}
-              receiptUrl={expense.receipt_signed_url}
-            />
-          ))}
+        <DataPanel title={`Gastos del mes (${finance.monthExpenses.length})`}>
+          {finance.monthExpenses.length === 0 ? (
+            <Empty text="No hay gastos este mes." />
+          ) : (
+            <MonthlyFinanceList kind="gastos">
+              {finance.monthExpenses.map((expense) => (
+                <FinanceRow
+                  key={expense.id}
+                  title={expense.concept}
+                  meta={`${expense.category} - ${projectNames.get(expense.project_id ?? "") ?? "General"} - ${expense.expense_date}`}
+                  amount={Number(expense.amount)}
+                  deleteAction={deleteExpenseAction}
+                  hiddenInputs={{ expense_id: expense.id, project_id: expense.project_id ?? "" }}
+                  receiptName={expense.receipt_file_name}
+                  receiptUrl={expense.receipt_signed_url}
+                />
+              ))}
+            </MonthlyFinanceList>
+          )}
         </DataPanel>
-        <DataPanel title="Ultimos cobros">
-          {finance.monthPayments.length === 0 ? <Empty text="No hay cobros este mes." /> : finance.monthPayments.slice(0, 8).map((payment) => (
-            <FinanceRow
-              key={payment.id}
-              title={projectNames.get(payment.project_id ?? "") ?? "Cobro vario"}
-              meta={`${payment.method} - ${payment.payment_date}`}
-              amount={Number(payment.amount)}
-              deleteAction={deletePaymentAction}
-              hiddenInputs={{ payment_id: payment.id, project_id: payment.project_id ?? "" }}
-              receiptName={payment.receipt_file_name}
-              receiptUrl={payment.receipt_signed_url}
-            />
-          ))}
+        <DataPanel title={`Cobros del mes (${finance.monthPayments.length})`}>
+          {finance.monthPayments.length === 0 ? (
+            <Empty text="No hay cobros este mes." />
+          ) : (
+            <MonthlyFinanceList kind="cobros">
+              {finance.monthPayments.map((payment) => (
+                <FinanceRow
+                  key={payment.id}
+                  title={projectNames.get(payment.project_id ?? "") ?? "Cobro vario"}
+                  meta={`${payment.method} - ${payment.payment_date}`}
+                  amount={Number(payment.amount)}
+                  deleteAction={deletePaymentAction}
+                  hiddenInputs={{ payment_id: payment.id, project_id: payment.project_id ?? "" }}
+                  receiptName={payment.receipt_file_name}
+                  receiptUrl={payment.receipt_signed_url}
+                />
+              ))}
+            </MonthlyFinanceList>
+          )}
         </DataPanel>
       </section>
     </div>
