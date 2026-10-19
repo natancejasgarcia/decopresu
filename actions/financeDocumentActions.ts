@@ -145,6 +145,7 @@ export async function scanFinancePhoto(id: string) {
       extraction = normalizeInvoiceDates(
         extractedInvoiceSchema.parse(JSON.parse(aiText(response))),
       );
+      if (response.notice) extraction.warnings.push(response.notice);
     } catch {
       throw new Error(
         "La IA no pudo extraer datos validos. Prueba con un PDF legible, una foto mas nitida o completa los campos manualmente.",
@@ -152,7 +153,12 @@ export async function scanFinancePhoto(id: string) {
     }
     const saved = await supabase
       .from("finance_documents")
-      .update({ extracted: extraction })
+      .update({
+        extracted: {
+          ...extraction,
+          ...(response.model ? { ai_model: response.model } : {}),
+        },
+      })
       .eq("id", id)
       .eq("status", "draft")
       .select("id")
@@ -160,7 +166,12 @@ export async function scanFinancePhoto(id: string) {
     if (saved.error)
       throw new Error("No se pudo guardar la lectura. Actualiza la pagina.");
     revalidatePath("/finance/scan");
-    return { extracted: extraction as Record<string, unknown> };
+    return {
+      extracted: {
+        ...extraction,
+        ...(response.model ? { ai_model: response.model } : {}),
+      } as Record<string, unknown>,
+    };
   } catch (e) {
     return {
       error: e instanceof Error ? e.message : "No se pudo escanear la factura.",

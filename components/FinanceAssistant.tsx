@@ -8,6 +8,8 @@ export function FinanceAssistant() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [question, setQuestion] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [model, setModel] = useState("");
   const [sources, setSources] = useState<
     { dataset: string; count: number; complete: boolean }[]
   >([]);
@@ -45,6 +47,8 @@ export function FinanceAssistant() {
             void run(async () => {
               setError("");
               setSources([]);
+              setNotice("");
+              setModel("");
               const history = [
                 ...messages.slice(-6),
                 { role: "user" as const, content: text },
@@ -62,6 +66,8 @@ export function FinanceAssistant() {
                   ]);
                   setQuestion("");
                   setSources(result.sources ?? []);
+                  setNotice(result.notice ?? "");
+                  setModel(result.model ?? "");
                 }
               } catch (e) {
                 setError(
@@ -95,6 +101,15 @@ export function FinanceAssistant() {
             {error}
           </p>
         )}
+        {notice && (
+          <p
+            role="status"
+            className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900"
+          >
+            {notice}
+          </p>
+        )}
+        {model && <p className="text-xs text-muted">Modelo: {model}</p>}
         {sources.length > 0 && (
           <p className="text-xs text-muted">
             Datos consultados:{" "}

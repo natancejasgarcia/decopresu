@@ -24,6 +24,7 @@ export async function askFinanceAssistant(input: unknown) {
     return { error: "Escribe una pregunta mas corta." };
   const conversation: unknown[] = [...parsed.data];
   const sources: { dataset: string; count: number; complete: boolean }[] = [];
+  const notices = new Set<string>();
   const today = new Intl.DateTimeFormat("sv-SE", {
     timeZone: "Europe/Madrid",
     year: "numeric",
@@ -57,11 +58,17 @@ export async function askFinanceAssistant(input: unknown) {
       const functions = (response.output ?? []).filter(
         (item) => item.type === "function_call",
       );
+      if (response.notice) notices.add(response.notice);
       if (!functions.length) {
         const answer = aiText(response);
         if (!answer)
           throw new Error("La IA no devolvio una respuesta. Prueba otra vez.");
-        return { answer, sources };
+        return {
+          answer,
+          sources,
+          model: response.model,
+          notice: [...notices].join(" "),
+        };
       }
       conversation.push(...(response.output ?? []));
       for (const call of functions) {

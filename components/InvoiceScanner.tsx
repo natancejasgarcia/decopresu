@@ -249,6 +249,11 @@ function InvoiceCard({
           >
             Ver original
           </a>
+          {typeof extracted.ai_model === "string" && (
+            <p className="mt-2 break-words text-xs text-muted">
+              Modelo: {extracted.ai_model}
+            </p>
+          )}
           {/* Private images are served through the authenticated route. */}
           {document.file_type === "application/pdf" ? (
             <a
