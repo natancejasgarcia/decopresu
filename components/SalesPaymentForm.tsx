@@ -26,7 +26,7 @@ export function SalesPaymentForm({
       }}
     >
       <label>
-        <span className="form-label">Importe cobrado (€)</span>
+        <span className="form-label">Importe cobrado, IVA incluido (€)</span>
         <input
           className="form-input"
           name="amount"

@@ -105,40 +105,79 @@ test("partial collections are isolated by invoice and never generate negative ou
   );
 });
 
-test("partial invoices use the requested base and VAT without changing the budget", () => {
+test("partial invoices treat the requested amount as VAT-inclusive without changing the budget", () => {
   const original = structuredClone(line);
-  for (const [vat, tax, total] of [
-    [21, 210, 1210],
-    [10, 100, 1100],
+  for (const [vat, tax, base] of [
+    [21, 173.55, 826.45],
+    [10, 90.91, 909.09],
     [0, 0, 1000],
   ]) {
-    const partial = sales.partialInvoiceLine({
+    const partial = sales.partialInvoiceLines({
       amount: "1000,00",
       vat_rate: vat,
       concept: "Anticipo de obra",
       notes: "Primera parte",
     });
-    assert.deepEqual(partial, {
-      concept: "Anticipo de obra",
-      notes: "Primera parte",
-      quantity: 1,
-      unit: "",
-      unit_price: 1000,
-      vat_rate: vat,
-    });
-    assert.equal(sales.salesTotals([partial]).tax, tax);
-    assert.equal(sales.salesTotals([partial]).total, total);
+    assert.deepEqual(partial, [
+      {
+        concept: "Anticipo de obra",
+        notes: "Primera parte",
+        quantity: 1,
+        unit: "",
+        unit_price: base,
+        vat_rate: vat,
+      },
+    ]);
+    assert.equal(sales.salesTotals(partial).tax, tax);
+    assert.equal(sales.salesTotals(partial).total, 1000);
   }
   assert.deepEqual(line, original);
   assert.equal(
-    sales.partialInvoiceLine({
-      amount: "56,86",
-      vat_rate: 21,
-      concept: "Parcial",
-      notes: "",
-    }).unit_price,
+    sales.salesTotals(
+      sales.partialInvoiceLines({
+        amount: "56,86",
+        vat_rate: 21,
+        concept: "Parcial",
+        notes: "",
+      }),
+    ).total,
     56.86,
   );
+});
+
+test("every gross cent amount keeps its exact total with existing per-line VAT rounding", () => {
+  for (const vat of [0, 10, 21]) {
+    const amounts = [
+      ...Array.from({ length: 25000 }, (_, index) => (index + 1) / 100),
+      500,
+      477,
+      1200,
+      350.5,
+      9999999,
+      9876543.21,
+    ];
+    for (const amount of amounts) {
+      const lines = sales.partialInvoiceLines({
+        amount,
+        vat_rate: vat,
+        concept: "Parcial",
+        notes: "",
+      });
+      assert.equal(
+        sales.salesTotals(lines).total,
+        amount,
+        `${amount} with ${vat}% VAT`,
+      );
+      assert.ok(lines.length <= 2);
+      assert.ok(
+        lines.every((line) => line.unit_price > 0 && line.vat_rate === vat),
+      );
+      assert.equal(
+        sales.salesDraftSchema.safeParse({ ...input, lines }).success,
+        true,
+      );
+    }
+  }
 });
 
 test("partial invoices reject invalid prices, excessive decimals and empty concepts", () => {

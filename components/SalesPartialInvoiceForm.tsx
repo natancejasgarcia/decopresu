@@ -5,7 +5,7 @@ import { Check, X } from "lucide-react";
 import { formatCurrency } from "@/lib/calculations";
 import {
   partialInvoiceSchema,
-  partialInvoiceLine,
+  partialInvoiceLines,
   salesTotals,
   type SalesLine,
 } from "@/lib/sales";
@@ -18,7 +18,7 @@ export function SalesPartialInvoiceForm({
 }: {
   sourceLabel: string;
   disabled: boolean;
-  onApply: (line: SalesLine) => void;
+  onApply: (lines: SalesLine[]) => void;
   onCancel: () => void;
 }) {
   const [amount, setAmount] = useState("");
@@ -36,7 +36,7 @@ export function SalesPartialInvoiceForm({
     vat_rate: vat,
   });
   const totals = parsed.success
-    ? salesTotals([partialInvoiceLine(parsed.data)])
+    ? salesTotals(partialInvoiceLines(parsed.data))
     : null;
 
   return (
@@ -49,7 +49,7 @@ export function SalesPartialInvoiceForm({
           setError(parsed.error.issues[0].message);
           return;
         }
-        onApply(partialInvoiceLine(parsed.data));
+        onApply(partialInvoiceLines(parsed.data));
       }}
     >
       <label className="sm:col-span-2">
@@ -64,7 +64,7 @@ export function SalesPartialInvoiceForm({
         />
       </label>
       <label>
-        <span className="form-label">Importe sin IVA (€)</span>
+        <span className="form-label">Importe final, IVA incluido (€)</span>
         <input
           className="form-input"
           inputMode="decimal"
@@ -94,7 +94,10 @@ export function SalesPartialInvoiceForm({
           aria-live="polite"
           className="flex flex-wrap justify-between gap-3 border-y border-line py-3 sm:col-span-2"
         >
-          <span>IVA: {formatCurrency(totals.tax)}</span>
+          <span>
+            Base: {formatCurrency(totals.subtotal)} · IVA incluido:{" "}
+            {formatCurrency(totals.tax)}
+          </span>
           <strong>Total factura: {formatCurrency(totals.total)}</strong>
         </div>
       )}

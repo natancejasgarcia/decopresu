@@ -91,9 +91,39 @@ export const partialInvoiceSchema = z.object({
   vat_rate: salesLineSchema.shape.vat_rate,
 });
 export type PartialInvoiceInput = z.infer<typeof partialInvoiceSchema>;
-export function partialInvoiceLine(input: PartialInvoiceInput): SalesLine {
+export function partialInvoiceLines(input: PartialInvoiceInput): SalesLine[] {
   const { amount, ...details } = partialInvoiceSchema.parse(input);
-  return { ...details, quantity: 1, unit: "", unit_price: amount };
+  const grossCents = Math.round(amount * 100);
+  const netCents = (grossCents * 100) / (100 + details.vat_rate);
+  const taxCents = (base: number) =>
+    Math.floor((base * details.vat_rate + 50) / 100);
+  const line = (base: number): SalesLine => ({
+    ...details,
+    quantity: 1,
+    unit: "",
+    unit_price: base / 100,
+  });
+  const nearest = Math.round(netCents);
+  if (nearest + taxCents(nearest) === grossCents) return [line(nearest)];
+
+  // Some gross cent amounts cannot be represented by one rounded net/VAT line.
+  // Split a small part at the same VAT rate so persisted and PDF totals stay exact.
+  for (const base of [Math.floor(netCents), Math.ceil(netCents)]) {
+    for (let part = 1; part <= Math.min(100, base - 1); part++) {
+      if (base + taxCents(base - part) + taxCents(part) === grossCents) {
+        return [
+          line(base - part),
+          {
+            ...line(part),
+            concept: `${details.concept.slice(0, 185)} (redondeo)`,
+            notes:
+              "Desglose del mismo importe para cuadrar el IVA al céntimo. Incluido en el total, sin cargo adicional.",
+          },
+        ];
+      }
+    }
+  }
+  throw new Error("No se pudo desglosar el IVA de este importe.");
 }
 export const dateSchema = z
   .string()
@@ -143,7 +173,8 @@ export function salesTotals(lines: SalesLine[]) {
   const groups = new Map<number, { base: number; tax: number }>();
   for (const line of lines) {
     const base = roundAmount(line.quantity * line.unit_price);
-    const tax = roundAmount((base * line.vat_rate) / 100);
+    const tax =
+      Math.floor((Math.round(base * 100) * line.vat_rate + 50) / 100) / 100;
     const group = groups.get(line.vat_rate) ?? { base: 0, tax: 0 };
     groups.set(line.vat_rate, {
       base: roundAmount(group.base + base),

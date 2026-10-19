@@ -4,6 +4,7 @@ const {
 const fs = require("node:fs");
 const path = require("node:path");
 const assert = require("node:assert/strict");
+const { partialInvoiceLines } = require("./load-ts.cjs")("lib/sales.ts");
 async function main() {
   const db = new PGlite();
   try {
@@ -270,6 +271,58 @@ async function main() {
       5401.7,
       "The original budget is unchanged",
     );
+    for (const [amount, vat] of [
+      [500, 21],
+      [1200, 21],
+      [0.03, 21],
+      [0.09, 21],
+      [4, 21],
+      [9999999, 21],
+      [23.49, 10],
+      [500, 0],
+    ]) {
+      const partial = await one(
+        "select public.create_sales_document('invoice',$1) as id",
+        [project],
+      );
+      await db.query("select public.save_sales_document($1,$2)", [
+        partial.id,
+        JSON.stringify({
+          ...invoiceData,
+          lines: partialInvoiceLines({
+            amount,
+            vat_rate: vat,
+            concept: "Importe final con IVA",
+            notes: "",
+          }),
+        }),
+      ]);
+      const stored = await one(
+        "select total from sales_documents where id=$1",
+        [partial.id],
+      );
+      assert.equal(
+        Number(stored.total),
+        amount,
+        "Stored total must equal the user's VAT-inclusive amount",
+      );
+      await db.query("select public.issue_sales_document($1)", [partial.id]);
+      await db.query(
+        "select public.record_sales_payment($1,$2,'2026-11-03','Tarjeta')",
+        [partial.id, amount],
+      );
+      assert.equal(
+        Number(
+          (
+            await one(
+              "select amount from project_payments where sales_document_id=$1",
+              [partial.id],
+            )
+          ).amount,
+        ),
+        amount,
+      );
+    }
     await db.exec(
       "reset role; select set_config('request.jwt.claim.sub','',false); set role authenticated;",
     );

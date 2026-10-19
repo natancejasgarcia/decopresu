@@ -416,8 +416,8 @@ export function SalesDocumentEditor({
                 sourceLabel={document.source_label}
                 disabled={pending}
                 onCancel={() => setPartialOpen(false)}
-                onApply={(line) => {
-                  update("lines", [line]);
+                onApply={(lines) => {
+                  update("lines", lines);
                   setPartialOpen(false);
                   setFeedback({
                     error: false,

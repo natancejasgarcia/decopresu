@@ -19,14 +19,12 @@ const doc = {
   issue_date: "2026-10-19",
   due_date: null,
   notes: "",
-  lines: [
-    sales.partialInvoiceLine({
-      amount: 1000,
-      vat_rate: 21,
-      concept: "Factura parcial",
-      notes: "",
-    }),
-  ],
+  lines: sales.partialInvoiceLines({
+    amount: 1210,
+    vat_rate: 21,
+    concept: "Factura parcial",
+    notes: "",
+  }),
   subtotal: 1000,
   tax_total: 210,
   total: 1210,
@@ -57,7 +55,8 @@ test("a partial draft exposes amount and VAT controls and keeps its normal edita
       initialPartial: true,
     }),
   );
-  assert.match(html, /Importe sin IVA/);
+  assert.match(html, /Importe final, IVA incluido/);
+  assert.doesNotMatch(html, /Importe sin IVA/);
   assert.match(html, /Usar este importe/);
   assert.match(html, /Trabajo o material/);
   assert.match(html, /Factura parcial/);
@@ -75,6 +74,7 @@ test("after issue, the payment question offers an actual dated receipt or the op
   assert.match(html, /name="amount"[^>]*max="1210"/);
   assert.match(html, /name="date"/);
   assert.match(html, /Guardar cobro/);
+  assert.match(html, /Importe cobrado, IVA incluido/);
   assert.match(html, /Ahora no/);
   assert.match(html, /Pendiente/);
 });
