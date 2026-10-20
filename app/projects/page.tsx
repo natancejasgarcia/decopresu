@@ -57,9 +57,9 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
     { data: projectReads, error: projectReadsError },
   ] = await Promise.all([
     query.returns<Project[]>(),
-    supabase.from("budget_items").select("*").returns<BudgetItem[]>(),
-    supabase.from("messages").select("id,project_id,user_id,text,created_at").returns<Message[]>(),
-    supabase.from("project_reads").select("*").eq("user_id", user.id).returns<ProjectRead[]>(),
+    supabase.from("budget_items").select("project_id,total").returns<Pick<BudgetItem, "project_id" | "total">[]>(),
+    supabase.from("messages").select("project_id,user_id,created_at").neq("user_id", user.id).returns<Pick<Message, "project_id" | "user_id" | "created_at">[]>(),
+    supabase.from("project_reads").select("project_id,last_read_at").eq("user_id", user.id).returns<Pick<ProjectRead, "project_id" | "last_read_at">[]>(),
   ]);
 
   const projectReadsUnavailable = isOptionalProjectsError(projectReadsError);

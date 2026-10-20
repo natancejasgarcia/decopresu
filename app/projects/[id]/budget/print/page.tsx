@@ -102,7 +102,8 @@ export default async function PrintBudgetPage({ params, searchParams }: PrintBud
               <h2 className="text-[17px] font-black text-[#152630]">Decoralia Pintores</h2>
               <p className="mt-2 text-[13px] leading-6 text-[#4a5560]">Teléfono: 653 529 351</p>
               <p className="text-[13px] leading-6 text-[#4a5560]">Email: info@decoraliapintores.com</p>
-              <p className="text-[13px] leading-6 text-[#4a5560]">CIF/NIF: —</p>
+              <p className="text-[13px] leading-6 text-[#4a5560]">CIF/NIF: B05673124</p>
+              <p className="text-[13px] leading-6 text-[#4a5560]">Domicilio fiscal: Calle Fénix, bloque 10, 2B</p>
             </div>
           </div>
 

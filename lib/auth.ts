@@ -31,11 +31,10 @@ export async function requireUserProfile(
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("user_id", user.id)
-    .single<Profile>();
+  const [{ data: profile }, accessResult] = await Promise.all([
+    supabase.from("profiles").select("*").eq("user_id", user.id).single<Profile>(),
+    supabase.rpc("app_access_role"),
+  ]);
 
   if (!profile) {
     const autoAuthorizedProfile = await createAutoAuthorizedProfile(user);
@@ -43,13 +42,13 @@ export async function requireUserProfile(
       redirect("/logout?error=unauthorized");
     }
 
-    return authorize(autoAuthorizedProfile);
+    return authorize(autoAuthorizedProfile, await supabase.rpc("app_access_role"));
   }
 
   return authorize(profile);
 
-  async function authorize(value: Profile) {
-    const { data, error } = await supabase.rpc("app_access_role");
+  async function authorize(value: Profile, resolvedAccess = accessResult) {
+    const { data, error } = resolvedAccess;
     const ready = !error && ["owner", "workspace", "reviewer"].includes(data);
     const role = ready
       ? (data as import("@/lib/access").AccessRole)

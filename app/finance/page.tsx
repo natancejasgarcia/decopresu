@@ -3,6 +3,7 @@ import { TopBar } from "@/components/TopBar";
 import { requireUserProfile } from "@/lib/auth";
 import { sortBudgetItems } from "@/lib/budget";
 import { parseMonthKey } from "@/lib/finance";
+import { signProjectFileUrls } from "@/lib/signedProjectFiles";
 import type { BudgetItem, FixedCost, Project, ProjectExpense, ProjectPayment } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -42,8 +43,14 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
     throw new Error(expensesError?.message ?? paymentsError?.message ?? fixedCostsError?.message);
   }
 
-  const expensesWithSignedReceipts = await signExpenseReceipts(supabase, financeTablesUnavailable ? [] : (expenses ?? []));
-  const paymentsWithSignedReceipts = await signPaymentReceipts(supabase, financeTablesUnavailable ? [] : (payments ?? []));
+  const expenseRows = financeTablesUnavailable ? [] : (expenses ?? []);
+  const paymentRows = financeTablesUnavailable ? [] : (payments ?? []);
+  const receiptUrls = await signProjectFileUrls(supabase, [
+    ...expenseRows.map((expense) => expense.receipt_file_url),
+    ...paymentRows.map((payment) => payment.receipt_file_url),
+  ]);
+  const expensesWithSignedReceipts = expenseRows.map((expense) => ({ ...expense, receipt_signed_url: expense.receipt_file_url ? receiptUrls.get(expense.receipt_file_url) : undefined }));
+  const paymentsWithSignedReceipts = paymentRows.map((payment) => ({ ...payment, receipt_signed_url: payment.receipt_file_url ? receiptUrls.get(payment.receipt_file_url) : undefined }));
 
   return (
     <main className="min-h-screen pb-24">
@@ -67,32 +74,4 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
 function isOptionalFinanceError(error: { code?: string } | null) {
   if (!error) return false;
   return error.code === "42P01" || error.code === "42703" || error.code === "42501";
-}
-
-async function signPaymentReceipts(
-  supabase: Awaited<ReturnType<typeof requireUserProfile>>["supabase"],
-  payments: ProjectPayment[],
-) {
-  return Promise.all(
-    payments.map(async (payment) => {
-      if (!payment.receipt_file_url) return payment;
-
-      const { data } = await supabase.storage.from("project-files").createSignedUrl(payment.receipt_file_url, 60 * 60);
-      return { ...payment, receipt_signed_url: data?.signedUrl };
-    }),
-  );
-}
-
-async function signExpenseReceipts(
-  supabase: Awaited<ReturnType<typeof requireUserProfile>>["supabase"],
-  expenses: ProjectExpense[],
-) {
-  return Promise.all(
-    expenses.map(async (expense) => {
-      if (!expense.receipt_file_url) return expense;
-
-      const { data } = await supabase.storage.from("project-files").createSignedUrl(expense.receipt_file_url, 60 * 60);
-      return { ...expense, receipt_signed_url: data?.signedUrl };
-    }),
-  );
 }

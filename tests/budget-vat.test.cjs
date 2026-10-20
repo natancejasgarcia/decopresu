@@ -134,6 +134,8 @@ test("PDF endpoint prints the selected VAT and matching rounded totals; rejects 
       assert.equal(response.status, 200);
       assert.match(response.headers.get("content-type"), /application\/pdf/);
       assert.ok(texts.includes(`IVA (${rate}%):`));
+      assert.ok(texts.some((text) => text.includes("CIF/NIF: B05673124")));
+      assert.ok(texts.some((text) => text.includes("Calle Fenix, bloque 10, 2B")));
       assert.ok(texts.some((text) => text.includes(total)));
       assert.ok(!texts.includes(`IVA (${rate === 10 ? 21 : 10}%):`));
       const bytes = Buffer.from(await response.arrayBuffer());
@@ -206,6 +208,8 @@ test("print view uses the same selected VAT and totals as the downloadable PDF",
       }),
     );
     assert.ok(html.includes(`IVA (${rate}%):`));
+    assert.ok(html.includes("CIF/NIF: B05673124"));
+    assert.ok(html.includes("Calle Fénix, bloque 10, 2B"));
     assert.ok(html.includes(total));
   }
 });

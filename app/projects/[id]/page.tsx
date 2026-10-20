@@ -3,11 +3,11 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { ProjectTabs } from "@/components/ProjectTabs";
-import { sortBudgetItems } from "@/lib/budget";
-import { buildBudgetConceptCatalog, type BudgetConceptSuggestion } from "@/lib/budgetConcepts";
+import { loadProjectPageData } from "@/lib/projectPageData";
+import { parseProjectTab } from "@/lib/projectTabs";
 import { formatCurrency } from "@/lib/calculations";
 import { requireUserProfile } from "@/lib/auth";
-import type { BudgetItem, Message, Profile, Project, ProjectExpense, ProjectFile, ProjectPayment, Room, RoomModule } from "@/lib/types";
+import type { Project } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -15,9 +15,10 @@ type ProjectPageProps = {
   params: {
     id: string;
   };
+  searchParams?: { tab?: string };
 };
 
-export default async function ProjectPage({ params }: ProjectPageProps) {
+export default async function ProjectPage({ params, searchParams }: ProjectPageProps) {
   const { supabase, profile } = await requireUserProfile();
   const { data: project } = await supabase
     .from("projects")
@@ -29,75 +30,8 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     notFound();
   }
 
-  const [
-    { data: messageData },
-    { data: fileData },
-    { data: roomData },
-    { data: roomModuleData, error: roomModuleError },
-    { data: budgetData },
-    { data: conceptData, error: conceptError },
-    { data: profileData },
-    { data: expenseData, error: expenseError },
-    { data: paymentData, error: paymentError },
-  ] = await Promise.all([
-    supabase.from("messages").select("*").eq("project_id", params.id).order("created_at", { ascending: true }).returns<Message[]>(),
-    supabase.from("project_files").select("*").eq("project_id", params.id).order("created_at", { ascending: false }).returns<ProjectFile[]>(),
-    supabase.from("rooms").select("*").eq("project_id", params.id).order("created_at", { ascending: false }).returns<Room[]>(),
-    supabase.from("room_modules").select("*").eq("project_id", params.id).order("created_at", { ascending: true }).returns<RoomModule[]>(),
-    supabase.from("budget_items").select("*").eq("project_id", params.id).order("created_at", { ascending: true }).returns<BudgetItem[]>(),
-    supabase.from("budget_items").select("concept,notes").not("notes", "is", null).neq("notes", "").order("created_at", { ascending: false }).limit(500).returns<BudgetConceptSuggestion[]>(),
-    supabase.from("profiles").select("*").returns<Profile[]>(),
-    supabase.from("project_expenses").select("*").eq("project_id", params.id).order("expense_date", { ascending: false }).returns<ProjectExpense[]>(),
-    supabase.from("project_payments").select("*").eq("project_id", params.id).order("payment_date", { ascending: false }).returns<ProjectPayment[]>(),
-  ]);
-
-  const messages = messageData ?? [];
-  const files = fileData ?? [];
-  const modules = isOptionalRoomModulesError(roomModuleError) ? [] : (roomModuleData ?? []);
-  const modulesByRoom = new Map<string, RoomModule[]>();
-  for (const module of modules) {
-    modulesByRoom.set(module.room_id, [...(modulesByRoom.get(module.room_id) ?? []), module]);
-  }
-  const rooms = (roomData ?? []).map((room) => ({
-    ...room,
-    modules: modulesByRoom.get(room.id) ?? [],
-  }));
-  const budgetItems = sortBudgetItems(budgetData ?? []);
-  if (conceptError) console.error("[Decoralia budget concepts]", conceptError.code);
-  const budgetConceptSuggestions = buildBudgetConceptCatalog(conceptData ?? []);
-  const expenses = expenseError?.code === "42P01" ? [] : (expenseData ?? []);
-  const payments = paymentError?.code === "42P01" ? [] : (paymentData ?? []);
-  const profiles = profileData ?? [];
-  const profileMap = new Map(profiles.map((item) => [item.user_id, item.name]));
-  const enrichedMessages = messages.map((message) => ({
-    ...message,
-    user_name: profileMap.get(message.user_id) ?? "Decoralia",
-  }));
-
-  const filesWithSignedUrls = await Promise.all(
-    files.map(async (file) => {
-      const { data } = await supabase.storage.from("project-files").createSignedUrl(file.file_url, 60 * 60);
-      return { ...file, signed_url: data?.signedUrl };
-    }),
-  );
-  const paymentsWithSignedReceipts = await Promise.all(
-    payments.map(async (payment) => {
-      if (!payment.receipt_file_url) return payment;
-
-      const { data } = await supabase.storage.from("project-files").createSignedUrl(payment.receipt_file_url, 60 * 60);
-      return { ...payment, receipt_signed_url: data?.signedUrl };
-    }),
-  );
-  const expensesWithSignedReceipts = await Promise.all(
-    expenses.map(async (expense) => {
-      if (!expense.receipt_file_url) return expense;
-
-      const { data } = await supabase.storage.from("project-files").createSignedUrl(expense.receipt_file_url, 60 * 60);
-      return { ...expense, receipt_signed_url: data?.signedUrl };
-    }),
-  );
-
-  const totalBudget = budgetItems.reduce((sum, item) => sum + Number(item.total), 0);
+  const activeTab = parseProjectTab(searchParams?.tab);
+  const data = await loadProjectPageData(supabase, params.id, activeTab);
 
   return (
     <main className="min-h-screen pb-24">
@@ -119,28 +53,19 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
             </div>
             <div className="rounded-lg bg-paper p-4 md:min-w-56">
               <span className="text-xs font-black uppercase text-muted">Presupuesto</span>
-              <strong className="mt-1 block text-2xl text-ink">{formatCurrency(totalBudget)}</strong>
+              <strong className="mt-1 block text-2xl text-ink">{formatCurrency(data.budgetTotal)}</strong>
               <p className="mt-1 text-sm font-bold text-muted">IVA no incluido</p>
             </div>
           </div>
         </section>
         <ProjectTabs
+          key={project.id}
           project={project}
           profile={profile}
-          messages={enrichedMessages}
-          files={filesWithSignedUrls}
-          rooms={rooms}
-          budgetItems={budgetItems}
-          budgetConceptSuggestions={budgetConceptSuggestions}
-          expenses={expensesWithSignedReceipts}
-          payments={paymentsWithSignedReceipts}
+          activeTab={activeTab}
+          {...data}
         />
       </div>
     </main>
   );
-}
-
-function isOptionalRoomModulesError(error: { code?: string } | null) {
-  if (!error) return false;
-  return error.code === "42P01" || error.code === "42703" || error.code === "42501" || error.code === "PGRST205";
 }

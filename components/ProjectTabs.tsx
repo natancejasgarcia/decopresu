@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   FileText,
@@ -11,14 +13,8 @@ import {
   UserRound,
   WalletCards,
 } from "lucide-react";
-import { BudgetBuilder } from "@/components/BudgetBuilder";
-import { ClientCard } from "@/components/ClientCard";
 import { CloneProjectButton } from "@/components/CloneProjectButton";
-import { FileUploader } from "@/components/FileUploader";
-import { ProjectChat } from "@/components/ProjectChat";
-import { ProjectEditForm } from "@/components/ProjectEditForm";
-import { ProjectFinancePanel } from "@/components/ProjectFinancePanel";
-import { RoomCalculator } from "@/components/RoomCalculator";
+import { PROJECT_TABS as TABS, projectTabHref, type ProjectTab as Tab } from "@/lib/projectTabs";
 import { formatCurrency } from "@/lib/calculations";
 import type { BudgetConceptSuggestion } from "@/lib/budgetConcepts";
 import type {
@@ -32,7 +28,21 @@ import type {
   Room,
 } from "@/lib/types";
 
+function PanelLoading() {
+  return <p className="p-4 text-base font-bold text-moss" role="status">Cargando apartado...</p>;
+}
+
+const BudgetBuilder = dynamic(() => import("@/components/BudgetBuilder").then((module) => module.BudgetBuilder), { loading: PanelLoading });
+const ClientCard = dynamic(() => import("@/components/ClientCard").then((module) => module.ClientCard), { loading: PanelLoading });
+const FileUploader = dynamic(() => import("@/components/FileUploader").then((module) => module.FileUploader), { loading: PanelLoading });
+const ProjectChat = dynamic(() => import("@/components/ProjectChat").then((module) => module.ProjectChat), { loading: PanelLoading });
+const ProjectEditForm = dynamic(() => import("@/components/ProjectEditForm").then((module) => module.ProjectEditForm), { loading: PanelLoading });
+const ProjectFinancePanel = dynamic(() => import("@/components/ProjectFinancePanel").then((module) => module.ProjectFinancePanel), { loading: PanelLoading });
+const RoomCalculator = dynamic(() => import("@/components/RoomCalculator").then((module) => module.RoomCalculator), { loading: PanelLoading });
+
 type ProjectTabsProps = {
+  activeTab: Tab;
+  budgetTotal: number;
   project: Project;
   profile: Profile;
   messages: Message[];
@@ -43,17 +53,6 @@ type ProjectTabsProps = {
   expenses: ProjectExpense[];
   payments: ProjectPayment[];
 };
-
-const TABS = [
-  "Resumen",
-  "Chat",
-  "Archivos",
-  "Cliente",
-  "Medidas",
-  "Presupuesto",
-  "Gastos",
-] as const;
-type Tab = (typeof TABS)[number];
 
 const TAB_ICONS = {
   Resumen: FileText,
@@ -66,6 +65,8 @@ const TAB_ICONS = {
 } satisfies Record<Tab, typeof FileText>;
 
 export function ProjectTabs({
+  activeTab,
+  budgetTotal,
   project,
   profile,
   messages,
@@ -76,12 +77,17 @@ export function ProjectTabs({
   expenses,
   payments,
 }: ProjectTabsProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("Resumen");
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [requestedTab, setRequestedTab] = useState<Tab>(activeTab);
   const [isEditingProject, setIsEditingProject] = useState(false);
-  const budgetTotal = budgetItems.reduce(
-    (sum, item) => sum + Number(item.total),
-    0,
-  );
+
+  function openTab(tab: Tab) {
+    if (tab === activeTab || isPending) return;
+    setRequestedTab(tab);
+    setIsEditingProject(false);
+    startTransition(() => router.push(projectTabHref(project.id, tab), { scroll: false }));
+  }
 
   return (
     <div>
@@ -107,7 +113,8 @@ export function ProjectTabs({
                     ? "bg-moss text-white shadow-soft"
                     : "bg-white text-ink"
                 }`}
-                onClick={() => setActiveTab(tab)}
+                aria-disabled={isPending || undefined}
+                onClick={() => openTab(tab)}
                 onKeyDown={(event) => {
                   const index = TABS.indexOf(tab);
                   let next: Tab | undefined;
@@ -119,7 +126,7 @@ export function ProjectTabs({
                   if (event.key === "End") next = TABS[TABS.length - 1];
                   if (next) {
                     event.preventDefault();
-                    setActiveTab(next);
+                    openTab(next);
                     document.getElementById(`project-tab-${next}`)?.focus();
                   }
                 }}
@@ -147,11 +154,13 @@ export function ProjectTabs({
         </div>
       </div>
 
+      {isPending ? <p className="mt-4 text-base font-bold text-moss" role="status">Abriendo {requestedTab}...</p> : null}
       <div
         className="mt-4"
         id="project-panel"
         role="tabpanel"
         aria-labelledby={`project-tab-${activeTab}`}
+        aria-busy={isPending}
       >
         {activeTab === "Resumen" ? (
           <section className="section-panel">

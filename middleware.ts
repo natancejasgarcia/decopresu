@@ -37,7 +37,8 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isPrivate = !["/login", "/logout"].includes(pathname);
   let home = "/dashboard";
-  if (user) {
+  // These routes are shared with reviewers; their server handlers still enforce access.
+  if (user && !reviewerPathAllowed(pathname)) {
     const { data: access } = await supabase.rpc("app_access_role");
     const reviewer =
       access === "reviewer" ||

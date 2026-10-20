@@ -172,7 +172,7 @@ export async function buildBudgetPdf({ project, items: itemsData, rooms: roomsDa
   y -= 22;
 
   page.drawText("Decoralia Pintores", { x: MARGIN, y, size: 11, font: fonts.bold, color: INK });
-  page.drawText("Teléfono: 653 529 351 · Email: info@decoraliapintores.com · CIF/NIF: -", {
+  page.drawText("Teléfono: 653 529 351 · Email: info@decoraliapintores.com · CIF/NIF: B05673124", {
     x: MARGIN,
     y: y - 13,
     size: 8,
@@ -180,7 +180,11 @@ export async function buildBudgetPdf({ project, items: itemsData, rooms: roomsDa
     color: MUTED,
   });
 
-  y -= 42;
+  page.drawText("Domicilio fiscal: Calle Fenix, bloque 10, 2B", {
+    x: MARGIN, y: y - 26, size: 8, font: fonts.regular, color: MUTED,
+  });
+
+  y -= 55;
   y = sectionTitle(page, "Datos del cliente", y, fonts);
   const colW = (PAGE_WIDTH - MARGIN * 2 - 14) / 2;
   drawLabelValue(page, "NOMBRE", project.client_name, MARGIN, y, fonts);
