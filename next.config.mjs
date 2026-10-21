@@ -5,6 +5,7 @@ const nextConfig = {
     serverActions: { bodySizeLimit: "4mb" },
     outputFileTracingIncludes: {
       "/sales/*/pdf": ["./public/decoralia-logo.png"],
+      "/sales/*/correction/*/pdf": ["./public/decoralia-logo.png"],
       "/projects": ["./public/decoralia-logo.png"],
       "/projects/*/budget/pdf": ["./public/decoralia-logo.png"],
     },

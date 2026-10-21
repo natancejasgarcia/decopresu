@@ -31,6 +31,9 @@ export type SalesDocument = {
   client_name: string;
   client_tax_id: string;
   client_address: string;
+  client_postal_code?: string;
+  client_city?: string;
+  client_province?: string;
   client_email: string;
   issue_date: string;
   due_date: string | null;
@@ -52,7 +55,7 @@ export type SalesPayment = {
 };
 export const DEFAULT_COMPANY: CompanySettings = {
   id: 1,
-  legal_name: "Decoralia Pintores",
+  legal_name: "DECORALIA ACABADOS, S.L.",
   tax_id: "",
   address: "",
   email: "",
@@ -156,6 +159,9 @@ export const salesDraftSchema = z
       .max(200),
     client_tax_id: z.string().trim().max(30),
     client_address: z.string().trim().max(400),
+    client_postal_code: z.string().trim().regex(/^(?:|\d{5})$/, "El codigo postal debe tener 5 digitos.").default(""),
+    client_city: z.string().trim().max(120).default(""),
+    client_province: z.string().trim().max(120).default(""),
     client_email: z.union([z.literal(""), z.string().trim().email()]),
     issue_date: dateSchema,
     due_date: z.union([z.literal(""), dateSchema]),

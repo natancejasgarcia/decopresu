@@ -10,6 +10,7 @@ import {
   CircleDollarSign,
   Download,
   FileText,
+  FilePenLine,
   Plus,
   Save,
   Trash2,
@@ -45,6 +46,9 @@ function inputFrom(doc: SalesDocument): SalesDraftInput {
     client_name: doc.client_name,
     client_tax_id: doc.client_tax_id,
     client_address: doc.client_address,
+    client_postal_code: doc.client_postal_code ?? "",
+    client_city: doc.client_city ?? "",
+    client_province: doc.client_province ?? "",
     client_email: doc.client_email,
     issue_date: doc.issue_date,
     due_date: doc.due_date ?? "",
@@ -318,6 +322,9 @@ export function SalesDocumentEditor({
       | "client_name"
       | "client_tax_id"
       | "client_address"
+      | "client_postal_code"
+      | "client_city"
+      | "client_province"
       | "client_email"
       | "issue_date"
       | "due_date",
@@ -336,12 +343,19 @@ export function SalesDocumentEditor({
         required={required}
         disabled={readonly || pending}
         maxLength={key === "client_address" ? 400 : undefined}
+        inputMode={key === "client_postal_code" ? "numeric" : undefined}
+        pattern={key === "client_postal_code" ? "[0-9]{5}" : undefined}
         onChange={(e) => update(key, e.target.value)}
       />
     </label>
   );
   return (
     <div className="space-y-6">
+      {readonly && document.kind === "invoice" ? (
+        <Link href={`/sales/${document.id}/correction`} className="action-secondary" prefetch={false}>
+          <FilePenLine size={20} /> Rectificar datos fiscales
+        </Link>
+      ) : null}
       <Link href={`/sales?kind=${document.kind}`} className="action-secondary">
         <ArrowLeft size={20} />
         Volver a {document.kind === "invoice" ? "facturas" : "albaranes"}
@@ -532,6 +546,9 @@ export function SalesDocumentEditor({
               document.kind === "invoice",
             )}
             {field("Correo electrónico", "client_email", "email")}
+            {field("Código postal", "client_postal_code", "text", document.kind === "invoice")}
+            {field("Población", "client_city", "text", document.kind === "invoice")}
+            {field("Provincia", "client_province", "text", document.kind === "invoice")}
             {field("Fecha del documento", "issue_date", "date", true)}
             {document.kind === "invoice" &&
               field("Vencimiento", "due_date", "date")}

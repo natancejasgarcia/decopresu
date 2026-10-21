@@ -13,6 +13,7 @@ export async function generateSalesPdf(
   document: SalesDocument,
   company: CompanySettings,
   logoBytes?: Uint8Array,
+  label = SALES_LABELS[document.kind],
 ) {
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
@@ -81,7 +82,7 @@ export async function generateSalesPdf(
     y = height - margin;
     text("DECORALIA PINTORES", margin, y, 12, true, green);
     text(
-      `${SALES_LABELS[document.kind]} ${document.number ?? "BORRADOR"}`,
+      `${label} ${document.number ?? "BORRADOR"}`,
       310,
       y,
       10,
@@ -115,7 +116,7 @@ export async function generateSalesPdf(
     });
     y -= 12;
   }
-  const title = SALES_LABELS[document.kind].toLocaleUpperCase("es");
+  const title = label.toLocaleUpperCase("es");
   if (logo) {
     const logoHeight = (190 * logo.height) / logo.width;
     page.drawImage(logo, {
@@ -125,11 +126,9 @@ export async function generateSalesPdf(
       height: logoHeight,
     });
   } else text("DECORALIA PINTORES", margin, y - 10, 16, true, green);
-  text(title, 365, y - 10, 17, true, green);
+  text(title, 365, y - 10, Math.min(17, 185 / bold.widthOfTextAtSize(safe(title), 1)), true, green);
   text(document.number ?? "BORRADOR SIN EMITIR", 365, y - 30, 11, true);
   text(`Fecha: ${displayDay(document.issue_date)}`, 365, y - 48, 10);
-  if (document.kind === "invoice")
-    text("Gestión interna", 365, y - 65, 9, false, muted);
   y -= 82;
   paragraph(company.legal_name, contentWidth, 11, true);
   if (company.tax_id)
@@ -155,6 +154,9 @@ export async function generateSalesPdf(
   );
   if (document.client_tax_id) paragraph(`NIF / CIF: ${document.client_tax_id}`);
   if (document.client_address) paragraph(document.client_address);
+  const clientLocality = [document.client_postal_code, document.client_city].filter(Boolean).join(" ");
+  if (clientLocality) paragraph(clientLocality);
+  if (document.client_province) paragraph(document.client_province);
   if (document.client_email)
     paragraph(document.client_email, contentWidth, 10, false, muted);
   if (document.source_label) {
@@ -335,7 +337,7 @@ export async function generateSalesPdf(
     });
   });
   pdf.setTitle(
-    `${SALES_LABELS[document.kind]} ${document.number ?? "Borrador"}`,
+    `${label} ${document.number ?? "Borrador"}`,
   );
   pdf.setAuthor(company.legal_name);
   return pdf.save();
