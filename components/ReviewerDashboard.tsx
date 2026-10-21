@@ -20,6 +20,7 @@ export function ReviewerDashboard() {
           <Link
             key={item.href}
             href={item.href}
+            prefetch={false}
             className="flex min-h-40 min-w-0 flex-col justify-between gap-6 rounded-lg border border-line bg-white p-4 text-moss hover:border-moss"
           >
             <span className="flex items-center justify-between gap-2">

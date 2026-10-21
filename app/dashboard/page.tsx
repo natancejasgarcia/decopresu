@@ -139,7 +139,7 @@ export default async function DashboardPage() {
             <h1 className="text-2xl font-bold sm:text-3xl">Inicio</h1>
             <p className="mt-1 text-base text-muted">Gestión de Decoralia</p>
           </div>
-          <Link className="action-secondary" href="/settings">
+          <Link className="action-secondary" href="/settings" prefetch={false}>
             <Settings size={20} />
             Empresa
           </Link>
@@ -154,6 +154,7 @@ export default async function DashboardPage() {
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={false}
                 className={`flex min-h-28 min-w-0 flex-col justify-between gap-3 rounded-lg border border-line p-4 transition hover:border-moss focus-visible:outline-moss ${item.tone}`}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -182,6 +183,7 @@ export default async function DashboardPage() {
           <Link
             className="mt-5 flex min-h-14 items-center justify-between gap-3 border-y border-line py-4 font-semibold text-moss"
             href="/sales"
+            prefetch={false}
           >
             <span>{draftCount} documentos en borrador</span>
             <ArrowRight size={20} />

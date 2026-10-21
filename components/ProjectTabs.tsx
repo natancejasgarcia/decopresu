@@ -140,6 +140,7 @@ export function ProjectTabs({
           <Link
             className="flex min-h-14 items-center justify-center gap-2 rounded-lg bg-white px-2 text-sm font-bold text-ink"
             href={`/sales?kind=delivery_note&project=${project.id}`}
+            prefetch={false}
           >
             <FileText size={17} />
             Albaranes
@@ -147,6 +148,7 @@ export function ProjectTabs({
           <Link
             className="flex min-h-14 items-center justify-center gap-2 rounded-lg bg-white px-2 text-sm font-bold text-ink"
             href={`/sales?kind=invoice&project=${project.id}`}
+            prefetch={false}
           >
             <ReceiptText size={17} />
             Facturas

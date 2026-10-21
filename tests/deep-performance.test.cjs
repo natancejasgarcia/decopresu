@@ -1,11 +1,22 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
+const fs = require("node:fs");
+const path = require("node:path");
 const { createClient } = require("@supabase/supabase-js");
 const { NextRequest } = require("next/server");
 const load = require("./load-ts.cjs");
 const { navigationUser } = load("lib/navigationIdentity.ts");
 const { loadProjectsList, projectsPageHref, PROJECTS_PAGE_SIZE } = load("lib/projectsList.ts");
+
+test("menus and dashboard shortcuts do not eagerly load authenticated pages", () => {
+  for (const file of ["components/MainNavigation.tsx", "components/ReviewerDashboard.tsx", "components/ProjectTabs.tsx", "app/dashboard/page.tsx"]) {
+    const source = fs.readFileSync(path.join(__dirname, "..", file), "utf8");
+    const links = source.match(/<Link\b[^>]*>/g) ?? [];
+    assert.ok(links.length, file);
+    for (const link of links) assert.match(link, /prefetch=\{false\}/, file);
+  }
+});
 
 test("navigation uses real ES256 signature verification: forged or expired tokens fail closed", async () => {
   const { privateKey, publicKey } = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });

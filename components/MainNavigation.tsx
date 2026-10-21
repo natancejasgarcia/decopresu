@@ -53,6 +53,7 @@ export function MainNavigation({
         return (
           <Link
             href={item.href}
+            prefetch={false}
             key={item.href}
             aria-current={active ? "page" : undefined}
             className={`${mobile ? "flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 px-1 text-xs" : "flex min-h-12 items-center gap-2 rounded-lg px-3 text-base"} font-bold ${active ? "bg-emerald-50 text-moss" : "text-ink hover:bg-paper"}`}
