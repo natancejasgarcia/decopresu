@@ -86,6 +86,7 @@ export function SalesCorrectionForm({ original, company, corrections }: {
         }}><FileCheck2 size={20} />Emitir rectificativa</button> : null}
       </div>
       {message ? <p role={message.error ? "alert" : "status"} className={message.error ? "feedback-error" : "feedback-success"}>{message.text}</p> : null}
+      {!message && savedId && !dirty && !issuedNumber ? <p role="status" className="feedback-success">Borrador guardado. Rectificativa pendiente de emision.</p> : null}
       {issueUncertain ? <button type="button" className="action-secondary" onClick={() => window.location.reload()}>Comprobar historial</button> : null}
     </form>
     {corrections.some(item => item.status === "issued") ? <section className="border-t border-line pt-5"><h2 className="mb-3 text-lg font-bold">Rectificativas emitidas</h2>
