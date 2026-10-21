@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useAsyncTask } from "@/lib/useAsyncTask";
 import { Save } from "lucide-react";
-import { saveCompanyAction } from "@/actions/salesActions";
+import { saveCompanySettings } from "@/lib/companySettingsClient";
 import type { CompanySettings } from "@/lib/sales";
 
 export function CompanySettingsForm({
@@ -20,6 +20,7 @@ export function CompanySettingsForm({
   const [pending, startTransition] = useAsyncTask();
   const [message, setMessage] = useState("");
   const [error, setError] = useState(false);
+  const [requiresLogin, setRequiresLogin] = useState(false);
   const fields: {
     key: Exclude<keyof CompanySettings, "id">;
     label: string;
@@ -39,17 +40,21 @@ export function CompanySettingsForm({
       onSubmit={(e) => {
         e.preventDefault();
         setMessage("");
+        setRequiresLogin(false);
         startTransition(async () => {
           try {
-            const result = await saveCompanyAction(settings);
+            const result = await saveCompanySettings(settings);
             setError(!result.ok);
             setMessage(
               result.ok ? "Datos de empresa guardados." : result.error,
             );
-            if (result.ok) onSaved?.(settings);
+            if (result.ok) {
+              setSettings(result.settings);
+              onSaved?.(result.settings);
+            } else setRequiresLogin(Boolean(result.requiresLogin));
           } catch {
             setError(true);
-            setMessage("No se pudo guardar. Vuelve a intentarlo.");
+            setMessage("No se pudo confirmar el guardado. Tus datos siguen en pantalla; vuelve a intentarlo.");
           }
         });
       }}
@@ -103,6 +108,7 @@ export function CompanySettingsForm({
           {message}
         </p>
       )}
+      {requiresLogin ? <a className="action-secondary justify-self-start" href="/login" target="_blank" rel="noopener noreferrer">Iniciar sesion</a> : null}
       <button
         className="action-primary justify-self-start"
         type="submit"

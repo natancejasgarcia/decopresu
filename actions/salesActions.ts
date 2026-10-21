@@ -10,12 +10,13 @@ import {
   salesUnavailable,
   type SalesDraftInput,
   type SalesKind,
+  type CompanySettings,
 } from "@/lib/sales";
 import { PAYMENT_METHODS } from "@/lib/types";
 
 type Result =
   { ok: true; id?: string; number?: string } | { ok: false; error: string };
-function failure(error: { message: string; code?: string }): Result {
+function failure(error: { message: string; code?: string }): Extract<Result, { ok: false }> {
   console.error("[Decoralia sales]", error.code, error.message);
   if (salesUnavailable(error) || error.code === "PGRST202")
     return {
@@ -138,21 +139,24 @@ export async function recordSalesPaymentAction(
   return { ok: true, id: String(data) };
 }
 export async function saveCompanyAction(
-  input: z.infer<typeof companySchema>,
-): Promise<Result> {
+  input: unknown,
+): Promise<{ ok: true; settings: CompanySettings } | { ok: false; error: string }> {
   const { supabase } = await requireUserProfile();
   const parsed = companySchema.safeParse(input);
-  if (!parsed.success)
-    return {
-      ok: false,
-      error:
-        "Revisa los datos. Las series admiten letras mayúsculas y números, hasta 8 caracteres.",
-    };
-  const { error } = await supabase
+  if (!parsed.success) {
+    const field = String(parsed.error.issues[0]?.path[0] ?? "");
+    const labels: Record<string, string> = { legal_name: "nombre fiscal", tax_id: "NIF / CIF", address: "direccion fiscal", email: "correo electronico", phone: "telefono", iban: "cuenta bancaria (IBAN)", invoice_series: "serie de facturas", delivery_series: "serie de albaranes" };
+    return { ok: false, error: field.endsWith("series") ? "Las series admiten letras mayusculas y numeros, hasta 8 caracteres." : `Revisa el campo ${labels[field] ?? "de datos de empresa"}.` };
+  }
+  const { data, error } = await supabase
     .from("company_settings")
-    .upsert({ id: 1, ...parsed.data });
+    .upsert({ id: 1, ...parsed.data })
+    .select("*")
+    .single<CompanySettings>();
+  if (error?.code === "42501") return { ok: false, error: "Tu usuario no tiene permiso para guardar los datos de empresa." };
   if (error) return failure(error);
+  if (!data) return { ok: false, error: "No se pudo confirmar el guardado de los datos de empresa." };
   revalidatePath("/settings");
   revalidatePath("/sales", "layout");
-  return { ok: true };
+  return { ok: true, settings: data };
 }

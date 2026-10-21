@@ -18,23 +18,34 @@ export async function middleware(request: NextRequest) {
         return request.cookies.get(name)?.value;
       },
       set(name: string, value: string, options: CookieOptions) {
-        request.cookies.set({ name, value, ...options });
-        response = NextResponse.next({ request });
-        response.cookies.set({ name, value, ...options });
+        updateCookie(name, value, options);
       },
       remove(name: string, options: CookieOptions) {
-        request.cookies.set({ name, value: "", ...options });
-        response = NextResponse.next({ request });
-        response.cookies.set({ name, value: "", ...options });
+        updateCookie(name, "", options);
       },
     },
   });
+
+  function updateCookie(name: string, value: string, options: CookieOptions) {
+    request.cookies.set({ name, value, ...options });
+    const previousCookies = response.cookies.getAll();
+    response = NextResponse.next({ request });
+    previousCookies.forEach((cookie) => response.cookies.set(cookie));
+    response.cookies.set({ name, value, ...options });
+  }
+
+  function withSessionCookies(target: NextResponse) {
+    response.cookies.getAll().forEach((cookie) => target.cookies.set(cookie));
+    return target;
+  }
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
+  // The JSON save handler enforces the same profile/role checks without redirecting the form.
+  if (pathname === "/settings/company" && request.method === "PUT") return response;
   const isPrivate = !["/login", "/logout"].includes(pathname);
   let home = "/dashboard";
   // These routes are shared with reviewers; their server handlers still enforce access.
@@ -50,10 +61,7 @@ export async function middleware(request: NextRequest) {
         url.pathname = home;
         url.search = "";
         const redirected = NextResponse.redirect(url);
-        response.cookies
-          .getAll()
-          .forEach((cookie) => redirected.cookies.set(cookie));
-        return redirected;
+        return withSessionCookies(redirected);
       }
     }
   }
@@ -61,7 +69,7 @@ export async function middleware(request: NextRequest) {
   if (isPrivate && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    return withSessionCookies(NextResponse.redirect(url));
   }
 
   if (
@@ -71,7 +79,7 @@ export async function middleware(request: NextRequest) {
   ) {
     const url = request.nextUrl.clone();
     url.pathname = home;
-    return NextResponse.redirect(url);
+    return withSessionCookies(NextResponse.redirect(url));
   }
 
   return response;
