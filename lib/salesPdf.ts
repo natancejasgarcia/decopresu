@@ -293,7 +293,7 @@ export async function generateSalesPdf(
     color: rgb(1, 1, 1),
   });
   y -= 56;
-  if (document.notes) {
+  if (document.kind === "delivery_note" && document.notes) {
     ensure(60);
     paragraph("OBSERVACIONES", contentWidth, 11, true, green);
     y -= 4;

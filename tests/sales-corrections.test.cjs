@@ -45,3 +45,27 @@ test('corrected PDF fixture includes official issuer, full client address and a 
   fs.writeFileSync('tmp/pdfs/correction-fiscal-test.pdf', bytes);
   assert.ok(bytes.length > 1500);
 });
+
+test('Sales hides trashed cards but keeps issued totals and exposes a recoverable trash action', () => {
+  const { SalesWorkspace } = load('components/SalesWorkspace.tsx', {
+    'next/link': { __esModule: true, default: ({ children, prefetch, ...props }) => React.createElement('a', props, children) },
+    'next/navigation': { useRouter: () => ({ replace() {}, push() {} }) },
+    '@/actions/salesActions': {},
+  });
+  const props = { documents: [original], payments: [], projects: [], initialKind: 'invoice', available: true };
+  const visible = renderToStaticMarkup(React.createElement(SalesWorkspace, props));
+  assert.match(visible, /Mover a papelera F\/2026\/0001/);
+  assert.match(visible, /Papelera/);
+  const trashed = renderToStaticMarkup(React.createElement(SalesWorkspace, { ...props, trashedIds: [original.id] }));
+  assert.doesNotMatch(trashed, /href="\/sales\/original"/);
+  assert.match(trashed, /121,00/);
+});
+
+test('invoice PDF omits stored general observations, but retains concepts and correction reference', async () => {
+  const { generateSalesPdf } = load('lib/salesPdf.ts');
+  fs.mkdirSync('tmp/pdfs', { recursive: true });
+  for (const kind of ['invoice', 'delivery_note']) {
+    const bytes = await generateSalesPdf({ ...original, kind, notes: 'PRIVATE_GENERAL_NOTES_TEST', lines: original.lines.map(line => ({ ...line, notes: 'CONCEPT_DESCRIPTION_TEST' })) }, correction.issuer);
+    fs.writeFileSync(`tmp/pdfs/notes-${kind}-test.pdf`, bytes);
+  }
+});

@@ -712,7 +712,7 @@ export function SalesDocumentEditor({
           </div>
         </div>
         <label className="block">
-          <span className="form-label">Observaciones</span>
+          <span className="form-label">{document.kind === "invoice" ? "Notas internas" : "Observaciones"}</span>
           <textarea
             className="form-input min-h-24"
             value={input.notes}

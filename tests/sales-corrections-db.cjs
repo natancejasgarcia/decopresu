@@ -34,6 +34,7 @@ async function main() {
     for (let i = 0; i < 2; i++) {
       await db.exec(sql('migrations/20261021_sales_customer_address.sql'));
       await db.exec(sql('migrations/20261021_sales_data_corrections.sql'));
+      await db.exec(sql('migrations/20261021_sales_trash.sql'));
     }
     assert.equal((await one('select legal_name from company_settings')).legal_name, 'DECORALIA ACABADOS, S.L.');
     assert.deepEqual((await one('select issuer from sales_documents where id=$1', [original])).issuer, before.issuer);
@@ -64,6 +65,18 @@ async function main() {
     for (const field of ['issuer', 'number', 'total', 'tax_total', 'subtotal', 'client_address', 'lines']) assert.deepEqual(after[field], before[field], field);
     assert.equal(Number((await one('select count(*) count from project_payments')).count), 1);
     assert.equal(Number((await one('select sum(amount) amount from project_payments')).amount), 40);
+    const originalSnapshot = await one('select * from sales_documents where id=$1', [original]);
+    await db.exec('set role authenticated');
+    await db.query('select set_sales_document_trashed($1,true)', [original]);
+    await db.query('select set_sales_document_trashed($1,true)', [original]);
+    assert.equal(Number((await one('select count(*) count from sales_document_trash')).count), 1);
+    assert.deepEqual(await one('select * from sales_documents where id=$1', [original]), originalSnapshot);
+    await db.query('select set_sales_document_trashed($1,false)', [original]);
+    await db.query('select set_sales_document_trashed($1,false)', [original]);
+    assert.equal(Number((await one('select count(*) count from sales_document_trash')).count), 0);
+    await assert.rejects(() => db.query('select set_sales_document_trashed($1,true)', ['00000000-0000-0000-0000-000000009999']), /Documento no encontrado/);
+    await db.exec('reset role');
+    assert.equal(Number((await one('select sum(amount) amount from project_payments')).amount), 40);
     await assert.rejects(() => db.query("update sales_data_corrections set reason='Cambiar' where id=$1", [correction]), /no puede modificarse/);
     const incomplete = (await one('select save_sales_data_correction($1,$2) id', [invoice, { ...correctionData, client_city: '' }])).id;
     await assert.rejects(() => db.query('select issue_sales_data_correction($1)', [incomplete]), /Completa NIF/);
@@ -71,9 +84,11 @@ async function main() {
     await assert.rejects(() => db.query("update sales_data_corrections set reason='Cambiar' where id=$1", [incomplete]), /permission denied/);
     await db.exec('reset role; set role anon');
     await assert.rejects(() => db.query('select issue_sales_data_correction($1)', [incomplete]), /permission denied/);
+    await assert.rejects(() => db.query('select set_sales_document_trashed($1,true)', [original]), /permission denied/);
     await db.exec('reset role; create or replace function public.is_decoralia_user() returns boolean language sql stable security definer as $$ select false $$; set role authenticated;');
     assert.equal(Number((await one('select count(*) count from sales_data_corrections')).count), 0);
     await assert.rejects(() => db.query('select save_sales_data_correction($1,$2)', [invoice, correctionData]), /Acceso no autorizado/);
+    await assert.rejects(() => db.query('select set_sales_document_trashed($1,true)', [original]), /Acceso no autorizado/);
     console.log('PASS: repeatable migrations; complete address; conversion; immutable originals; corrections numbering/idempotency; no duplicate sale or payment; restricted access.');
   } finally { await db.close(); }
 }

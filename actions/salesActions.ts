@@ -102,6 +102,15 @@ export async function deleteSalesDraftAction(id: string): Promise<Result> {
   refresh();
   return { ok: true };
 }
+export async function setSalesDocumentTrashedAction(id: string, trashed: boolean): Promise<Result> {
+  const { supabase } = await requireUserProfile();
+  if (!z.string().uuid().safeParse(id).success || typeof trashed !== "boolean")
+    return { ok: false, error: "Documento no valido." };
+  const { error } = await supabase.rpc("set_sales_document_trashed", { p_id: id, p_trashed: trashed });
+  if (error) return failure(error);
+  refresh(id);
+  return { ok: true };
+}
 export async function recordSalesPaymentAction(
   id: string,
   formData: FormData,

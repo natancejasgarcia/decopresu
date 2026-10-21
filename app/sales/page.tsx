@@ -18,6 +18,7 @@ export default async function SalesPage({
     { data: docs, error },
     { data: payments, error: paymentError },
     { data: projects, error: projectError },
+    { data: trash, error: trashError },
   ] = await Promise.all([
     supabase
       .from("sales_documents")
@@ -34,9 +35,10 @@ export default async function SalesPage({
       .select("id,name,client_name")
       .order("name")
       .returns<SalesProject[]>(),
+    supabase.from("sales_document_trash").select("document_id").returns<{ document_id: string }[]>(),
   ]);
   if (
-    projectError ||
+    projectError || (trashError && !salesUnavailable(trashError)) ||
     (error && !salesUnavailable(error)) ||
     (paymentError && !salesUnavailable(paymentError))
   )
@@ -55,6 +57,7 @@ export default async function SalesPage({
           }
           projectId={searchParams.project}
           available={!error && !paymentError}
+          trashedIds={(trash ?? []).map(item => item.document_id)}
         />
       </div>
     </main>

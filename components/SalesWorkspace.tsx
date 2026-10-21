@@ -10,8 +10,10 @@ import {
   FilePlus2,
   FileText,
   Search,
+  Trash2,
+  RotateCcw,
 } from "lucide-react";
-import { createSalesDocumentAction } from "@/actions/salesActions";
+import { createSalesDocumentAction, setSalesDocumentTrashedAction } from "@/actions/salesActions";
 import {
   documentBalance,
   displayDay,
@@ -31,6 +33,7 @@ type Props = {
   initialKind: SalesKind;
   projectId?: string;
   available: boolean;
+  trashedIds?: string[];
 };
 export function SalesWorkspace({
   documents,
@@ -39,6 +42,7 @@ export function SalesWorkspace({
   initialKind,
   projectId = "",
   available,
+  trashedIds = [],
 }: Props) {
   const router = useRouter();
   const [kind, setKind] = useState(initialKind);
@@ -53,9 +57,14 @@ export function SalesWorkspace({
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [forceNewDraft, setForceNewDraft] = useState(false);
   const [creationUncertain, setCreationUncertain] = useState(false);
+  const [showTrash, setShowTrash] = useState(false);
+  const [trashOverrides, setTrashOverrides] = useState<Record<string, boolean>>({});
+  const [notification, setNotification] = useState("");
+  const isTrashed = (id: string) => trashOverrides[id] ?? trashedIds.includes(id);
   const existingDraft = documents.find(
     (document) =>
       document.status === "draft" &&
+      !isTrashed(document.id) &&
       document.kind === kind &&
       (document.project_id ?? "") === selectedProject,
   );
@@ -77,6 +86,7 @@ export function SalesWorkspace({
     const balance = documentBalance(d, payments);
     return (
       d.kind === kind &&
+      isTrashed(d.id) === showTrash &&
       [d.number ?? "Borrador", d.client_name, d.source_label]
         .join(" ")
         .toLocaleLowerCase("es")
@@ -97,6 +107,19 @@ export function SalesWorkspace({
           d.due_date < today))
     );
   });
+  function trashDocument(document: SalesDocument, trashed: boolean) {
+    if (pending) return;
+    if (trashed && !window.confirm(`Mover ${document.number ?? "este borrador"} a la papelera? Se puede recuperar. No anula la factura ni elimina sus cobros.`)) return;
+    setError(""); setNotification("");
+    startTransition(async () => {
+      try {
+        const result = await setSalesDocumentTrashedAction(document.id, trashed);
+        if (!result.ok) { setError(result.error); return; }
+        setTrashOverrides(current => ({ ...current, [document.id]: trashed }));
+        setNotification(trashed ? "Documento movido a la papelera. Sus importes y cobros se conservan." : "Documento recuperado.");
+      } catch { setError("No se pudo confirmar el cambio. Actualiza la lista para comprobar el estado."); }
+    });
+  }
   function create() {
     if (creationUncertain) return;
     if (createdIdRef.current) {
@@ -283,7 +306,11 @@ export function SalesWorkspace({
               <FilePlus2 size={20} />
               {kind === "invoice" ? "Nueva factura" : "Nuevo albarán"}
             </button>
+            <button type="button" className={showTrash ? "action-primary" : "action-secondary"} disabled={opening} onClick={() => { setShowTrash(!showTrash); setNotification(""); }}>
+              <Trash2 size={20} />{showTrash ? "Volver a documentos" : "Papelera"}
+            </button>
           </div>
+          {showTrash ? <p className="text-sm text-muted">Los documentos de la papelera se pueden recuperar. Las facturas emitidas conservan sus importes y cobros; no estan anuladas fiscalmente.</p> : null}
           {creating && (
             <div className="grid gap-3 border-b border-line pb-5 sm:grid-cols-[1fr_auto]">
               <label>
@@ -386,6 +413,7 @@ export function SalesWorkspace({
               {error}
             </p>
           )}
+          {notification ? <p className="feedback-success" role="status">{notification}</p> : null}
           {creationUncertain && (
             <button
               className="action-secondary"
@@ -428,11 +456,11 @@ export function SalesWorkspace({
                       ? "bg-emerald-50 text-emerald-900"
                       : "bg-amber-50 text-amber-900";
                 return (
-                  <Link
+                  <article
                     key={doc.id}
-                    href={`/sales/${doc.id}`}
-                    className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-line bg-white p-4 hover:border-moss focus-visible:outline-moss"
+                    className="flex min-w-0 items-stretch rounded-lg border border-line bg-white hover:border-moss"
                   >
+                  <Link href={`/sales/${doc.id}`} prefetch={false} className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-4 p-4 focus-visible:outline-moss">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap gap-2">
                         <strong>
@@ -465,6 +493,12 @@ export function SalesWorkspace({
                     </div>
                     <ArrowRight size={22} className="shrink-0 text-moss" />
                   </Link>
+                  <div className="flex shrink-0 items-center border-l border-line px-3">
+                    <button type="button" className="action-secondary" disabled={pending} title={showTrash ? "Recuperar documento" : "Mover a papelera"} aria-label={`${showTrash ? "Recuperar" : "Mover a papelera"} ${doc.number ?? `${SALES_LABELS[doc.kind]} en borrador`}`} onClick={() => trashDocument(doc, !showTrash)}>
+                      {showTrash ? <RotateCcw size={20} /> : <Trash2 size={20} className="text-red-600" />}
+                    </button>
+                  </div>
+                  </article>
                 );
               })
             )}
