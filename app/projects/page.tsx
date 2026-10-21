@@ -1,15 +1,12 @@
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 import { ProjectCard } from "@/components/ProjectCard";
 import { TopBar } from "@/components/TopBar";
 import { requireUserProfile } from "@/lib/auth";
+import { loadProjectsList, projectsPageHref } from "@/lib/projectsList";
 import {
   PROJECT_STATUSES,
   PROJECT_TYPES,
-  type BudgetItem,
-  type Message,
-  type Project,
-  type ProjectRead,
   type ProjectStatus,
   type ProjectType,
 } from "@/lib/types";
@@ -21,6 +18,7 @@ type ProjectsPageProps = {
     q?: string;
     status?: ProjectStatus | "Todos";
     type?: ProjectType | "Todos";
+    page?: string;
   };
 };
 
@@ -32,60 +30,8 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
     ? (searchParams.type as ProjectType)
     : "Todos";
 
-  let query = supabase
-    .from("projects")
-    .select("*")
-    .order("last_activity_at", { ascending: false });
-
-  if (status !== "Todos") {
-    query = query.eq("status", status);
-  }
-
-  if (projectType !== "Todos") {
-    query = query.eq("project_type", projectType);
-  }
-
-  if (q) {
-    const term = `%${q.replaceAll("%", "")}%`;
-    query = query.or(`name.ilike.${term},client_name.ilike.${term},address.ilike.${term}`);
-  }
-
-  const [
-    { data: projects, error },
-    { data: budgetItems, error: budgetItemsError },
-    { data: messages, error: messagesError },
-    { data: projectReads, error: projectReadsError },
-  ] = await Promise.all([
-    query.returns<Project[]>(),
-    supabase.from("budget_items").select("project_id,total").returns<Pick<BudgetItem, "project_id" | "total">[]>(),
-    supabase.from("messages").select("project_id,user_id,created_at").neq("user_id", user.id).returns<Pick<Message, "project_id" | "user_id" | "created_at">[]>(),
-    supabase.from("project_reads").select("project_id,last_read_at").eq("user_id", user.id).returns<Pick<ProjectRead, "project_id" | "last_read_at">[]>(),
-  ]);
-
-  const projectReadsUnavailable = isOptionalProjectsError(projectReadsError);
-
-  if (error || budgetItemsError || messagesError || (!projectReadsUnavailable && projectReadsError)) {
-    throw new Error(error?.message ?? budgetItemsError?.message ?? messagesError?.message ?? projectReadsError?.message);
-  }
-
-  const projectBudgetTotals = new Map<string, number>();
-  for (const item of budgetItems ?? []) {
-    projectBudgetTotals.set(item.project_id, (projectBudgetTotals.get(item.project_id) ?? 0) + Number(item.total));
-  }
-
-  const lastReadByProject = new Map((projectReadsUnavailable ? [] : projectReads ?? []).map((read) => [read.project_id, new Date(read.last_read_at).getTime()]));
-  const unreadByProject = new Map<string, number>();
-
-  for (const message of messages ?? []) {
-    if (message.user_id === user.id) {
-      continue;
-    }
-
-    const lastReadAt = lastReadByProject.get(message.project_id) ?? 0;
-    if (new Date(message.created_at).getTime() > lastReadAt) {
-      unreadByProject.set(message.project_id, (unreadByProject.get(message.project_id) ?? 0) + 1);
-    }
-  }
+  const filters = { q, status, type: projectType };
+  const { projects, total, page, pages, budgetTotals, unreadCounts } = await loadProjectsList(supabase, user.id, { ...filters, page: searchParams.page });
 
   return (
     <main className="min-h-screen pb-24">
@@ -129,8 +75,8 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
               <ProjectCard
                 key={project.id}
                 project={project}
-                budgetTotal={projectBudgetTotals.get(project.id) ?? 0}
-                unreadCount={unreadByProject.get(project.id) ?? 0}
+                budgetTotal={budgetTotals.get(project.id) ?? 0}
+                unreadCount={unreadCounts.get(project.id) ?? 0}
               />
             ))
           ) : (
@@ -140,14 +86,16 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
             </div>
           )}
         </section>
+        <nav aria-label="Paginas de proyectos" className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line py-4">
+          <p className="text-sm font-semibold text-muted">{total} obras · Pagina {page} de {pages}</p>
+          <div className="flex gap-2">
+            {page > 1 ? <Link prefetch={false} href={projectsPageHref(filters, page - 1)} className="action-secondary" aria-label="Pagina anterior"><ChevronLeft size={20} />Anterior</Link> : null}
+            {page < pages ? <Link prefetch={false} href={projectsPageHref(filters, page + 1)} className="action-secondary" aria-label="Pagina siguiente">Siguiente<ChevronRight size={20} /></Link> : null}
+          </div>
+        </nav>
       </div>
     </main>
   );
-}
-
-function isOptionalProjectsError(error: { code?: string } | null) {
-  if (!error) return false;
-  return error.code === "42P01" || error.code === "42703" || error.code === "42501";
 }
 
 function ProjectTypeTab({

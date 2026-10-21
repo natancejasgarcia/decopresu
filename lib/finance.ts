@@ -2,7 +2,7 @@ import type { BudgetItem, FixedCost, Project, ProjectExpense, ProjectPayment, Pr
 
 export const FINANCE_STATUSES: ProjectStatus[] = ["Aprobado", "En ejecución", "Terminado", "Cobrado"];
 
-export function projectBudgetTotals(items: BudgetItem[]) {
+export function projectBudgetTotals(items: Pick<BudgetItem, "project_id" | "total">[]) {
   const totals = new Map<string, number>();
 
   for (const item of items) {
@@ -57,7 +57,7 @@ export function buildMonthlyFinance({
   month,
 }: {
   projects: Project[];
-  budgetItems: BudgetItem[];
+  budgetItems: Pick<BudgetItem, "project_id" | "total">[];
   expenses: ProjectExpense[];
   payments: ProjectPayment[];
   fixedCosts: FixedCost[];

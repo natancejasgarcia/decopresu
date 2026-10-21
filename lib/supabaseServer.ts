@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { timedSupabaseFetch } from "@/lib/supabaseTiming";
 
 export function createServerSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -13,6 +14,7 @@ export function createServerSupabaseClient() {
   const cookieStore = cookies();
 
   return createServerClient(url, anonKey, {
+    global: { fetch: timedSupabaseFetch("server") },
     cookies: {
       get(name: string) {
         return cookieStore.get(name)?.value;

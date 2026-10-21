@@ -2,6 +2,8 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 // Vercel can bundle this entry independently of Next.js path aliases.
 import { fallbackAccess, reviewerPathAllowed } from "./lib/access";
+import { navigationUser } from "./lib/navigationIdentity";
+import { timedSupabaseFetch } from "./lib/supabaseTiming";
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -13,6 +15,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    global: { fetch: timedSupabaseFetch("middleware") },
     cookies: {
       get(name: string) {
         return request.cookies.get(name)?.value;
@@ -39,18 +42,18 @@ export async function middleware(request: NextRequest) {
     return target;
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await navigationUser(supabase.auth);
 
   const pathname = request.nextUrl.pathname;
   // The JSON save handler enforces the same profile/role checks without redirecting the form.
   if (pathname === "/settings/company" && request.method === "PUT") return response;
   const isPrivate = !["/login", "/logout"].includes(pathname);
   let home = "/dashboard";
-  // These routes are shared with reviewers; their server handlers still enforce access.
+  // Pages/actions check the current user and role in requireUserProfile. Legacy PDF
+  // handlers still need the role guard here; do not remove it from those endpoints.
+  const legacyPdf = /^\/(?:projects\/[^/]+\/budget|sales\/[^/]+)\/pdf$/.test(pathname);
   if (user && !reviewerPathAllowed(pathname)) {
-    const { data: access } = await supabase.rpc("app_access_role");
+    const access = legacyPdf ? (await supabase.rpc("app_access_role")).data : null;
     const reviewer =
       access === "reviewer" ||
       fallbackAccess(user.email, "member") === "reviewer";

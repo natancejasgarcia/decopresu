@@ -126,7 +126,7 @@ test("parallel access checks still enforce owner and reviewer restrictions", asy
   assert.equal((await auth(null, "dashboard", { error: { code: "missing" }, email: "decoralia1977@gmail.com" })).profile.access_role, "reviewer");
 });
 
-test("middleware avoids redundant role queries on shared routes but still protects restricted routes", async () => {
+test("middleware avoids duplicate page role queries and keeps reviewer redirects and PDF guards", async () => {
   const previous = [process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY];
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.test";
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test";
@@ -143,8 +143,10 @@ test("middleware avoids redundant role queries on shared routes but still protec
     assert.equal(calls, 0);
     assert.equal(checks, 5);
     const restricted = await middleware(new NextRequest("https://example.test/projects"));
-    assert.equal(calls, 1);
+    assert.equal(calls, 0);
     assert.equal(restricted.headers.get("location"), "https://example.test/dashboard");
+    await middleware(new NextRequest("https://example.test/projects/project/budget/pdf"));
+    assert.equal(calls, 1);
     signedIn = false;
     const loggedOut = await middleware(new NextRequest("https://example.test/dashboard"));
     assert.equal(loggedOut.headers.get("location"), "https://example.test/login");

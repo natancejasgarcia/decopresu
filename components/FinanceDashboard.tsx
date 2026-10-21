@@ -22,7 +22,7 @@ import {
 
 type FinanceDashboardProps = {
   projects: Project[];
-  budgetItems: BudgetItem[];
+  budgetItems: Pick<BudgetItem, "project_id" | "total">[];
   expenses: ProjectExpense[];
   payments: ProjectPayment[];
   fixedCosts: FixedCost[];

@@ -93,6 +93,7 @@ export function ClientsDirectory({ projects }: { projects: Project[] }) {
                   <Link
                     className="flex min-h-14 items-center justify-between gap-3 py-3"
                     href={`/projects/${project.id}`}
+                    prefetch={false}
                   >
                     <span className="min-w-0 break-words">
                       <strong>{project.name}</strong>

@@ -7,7 +7,7 @@ export default async function ClientsPage() {
   const { supabase, profile } = await requireUserProfile();
   const { data, error } = await supabase
     .from("projects")
-    .select("*")
+    .select("id,name,status,client_name,client_phone,client_email")
     .order("updated_at", { ascending: false })
     .returns<Project[]>();
   if (error) throw new Error("No se pudieron cargar los clientes.");

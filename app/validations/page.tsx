@@ -22,17 +22,12 @@ export default async function ValidationsPage() {
     .select("*")
     .order("created_at", { ascending: false });
   if (!owner) query = query.eq("is_validated", false);
-  const { data, error } = await query.returns<BudgetValidation[]>();
+  const [{ data, error }, projectResult] = await Promise.all([
+    query.returns<BudgetValidation[]>(),
+    reviewer ? Promise.resolve({ data: [] as Project[] }) : supabase.from("projects").select("id,name,client_name").order("name").returns<Project[]>(),
+  ]);
   if (error) throw new Error("No se pudieron cargar las validaciones.");
-  const projects = reviewer
-    ? []
-    : ((
-        await supabase
-          .from("projects")
-          .select("id,name,client_name")
-          .order("name")
-          .returns<Project[]>()
-      ).data ?? []);
+  const projects = projectResult.data ?? [];
   const validations = (data ?? []).map((item) => ({
     ...item,
     file_url: "",

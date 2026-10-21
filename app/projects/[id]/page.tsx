@@ -20,18 +20,21 @@ type ProjectPageProps = {
 
 export default async function ProjectPage({ params, searchParams }: ProjectPageProps) {
   const { supabase, profile } = await requireUserProfile();
-  const { data: project } = await supabase
-    .from("projects")
-    .select("*")
-    .eq("id", params.id)
-    .single<Project>();
+  const activeTab = parseProjectTab(searchParams?.tab);
+  const [{ data: project }, section] = await Promise.all([
+    supabase.from("projects").select("*").eq("id", params.id).single<Project>(),
+    loadProjectPageData(supabase, params.id, activeTab).then(
+      (data) => ({ data, error: null }),
+      (error: unknown) => ({ data: null, error }),
+    ),
+  ]);
 
   if (!project) {
     notFound();
   }
 
-  const activeTab = parseProjectTab(searchParams?.tab);
-  const data = await loadProjectPageData(supabase, params.id, activeTab);
+  if (!section.data) throw section.error;
+  const data = section.data;
 
   return (
     <main className="min-h-screen pb-24">

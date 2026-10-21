@@ -48,7 +48,7 @@ export function ProjectCard({ project, budgetTotal = 0, unreadCount = 0 }: Proje
 
   return (
     <article className={`rounded-lg border p-4 shadow-soft transition hover:-translate-y-0.5 hover:border-moss ${statusStyle.border} ${statusStyle.wash}`}>
-      <Link href={`/projects/${project.id}`} className="block">
+      <Link href={`/projects/${project.id}`} prefetch={false} className="block">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-black text-ink">{project.name}</h2>

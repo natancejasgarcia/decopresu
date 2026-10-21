@@ -21,7 +21,9 @@ module.exports = function load(relative, mocks = {}, cache = new Map()) {
             mocks,
             cache,
           )
-        : original(name);
+        : name.startsWith(".") && fs.existsSync(path.resolve(path.dirname(filename), name + ".ts"))
+          ? load(path.resolve(path.dirname(filename), name + ".ts"), mocks, cache)
+          : original(name);
   mod._compile(
     ts.transpileModule(fs.readFileSync(filename, "utf8"), {
       compilerOptions: {
