@@ -9,6 +9,11 @@ const load = require("./load-ts.cjs");
 const { navigationUser } = load("lib/navigationIdentity.ts");
 const { loadProjectsList, projectsPageHref, PROJECTS_PAGE_SIZE } = load("lib/projectsList.ts");
 
+test("server functions run beside the Ireland database, without multi-region expansion", () => {
+  const config = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "vercel.json"), "utf8"));
+  assert.deepEqual(config.regions, ["dub1"]);
+});
+
 test("menus and dashboard shortcuts do not eagerly load authenticated pages", () => {
   for (const file of ["components/MainNavigation.tsx", "components/ReviewerDashboard.tsx", "components/ProjectTabs.tsx", "app/dashboard/page.tsx"]) {
     const source = fs.readFileSync(path.join(__dirname, "..", file), "utf8");
@@ -145,6 +150,7 @@ test("slow-query diagnostics never log URLs, credentials, filters or customer da
     assert.equal(response.status, 503);
     assert.equal(logs.length, 1);
     assert.match(logs[0], /db.projects/);
+    assert.match(logs[0], /executionRegion/);
     assert.doesNotMatch(logs[0], /PRIVATE|SECRET|example.test|authorization|client_name/);
   } finally { global.fetch = originalFetch; console.info = originalInfo; }
 });

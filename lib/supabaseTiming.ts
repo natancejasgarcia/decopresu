@@ -20,7 +20,7 @@ export function timedSupabaseFetch(layer: "middleware" | "server") {
       const durationMs = Date.now() - start;
       if (durationMs >= 400 || status >= 500 || status === 0) {
         // Only operation names and timings: no URLs, customer data, cookies or tokens.
-        console.info("[Decoralia performance]", JSON.stringify({ layer, operation: operation(input), durationMs, status }));
+        console.info("[Decoralia performance]", JSON.stringify({ layer, executionRegion: process.env.VERCEL_REGION ?? "local", operation: operation(input), durationMs, status }));
       }
     }
   };
