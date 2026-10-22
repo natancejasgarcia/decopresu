@@ -13,10 +13,12 @@ export function ProjectCardActions({
   projectId,
   projectName,
   children,
+  highlightControl,
 }: {
   projectId: string;
   projectName: string;
   children?: ReactNode;
+  highlightControl?: ReactNode;
 }) {
   const router = useRouter();
   const requestId = useRef<string>();
@@ -52,6 +54,7 @@ export function ProjectCardActions({
       <div className="flex flex-wrap items-center justify-between gap-2">
         {children}
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
+          {highlightControl}
           <button
             type="button"
             onClick={send}

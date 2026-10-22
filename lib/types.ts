@@ -43,6 +43,7 @@ export type Project = {
   description: string;
   status: ProjectStatus;
   project_type: ProjectType;
+  is_highlighted?: boolean;
   internal_notes: string | null;
   created_by: string | null;
   created_at: string;

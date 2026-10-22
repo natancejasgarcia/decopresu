@@ -49,6 +49,8 @@ create table if not exists public.projects (
   last_activity_at timestamptz not null default now()
 );
 
+alter table public.projects add column if not exists is_highlighted boolean not null default false;
+
 create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.projects(id) on delete cascade,

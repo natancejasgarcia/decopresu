@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Euro, MapPin, MessageSquareText } from "lucide-react";
-import { ProjectCardActions } from "@/components/ProjectCardActions";
+import { ProjectCardFrame } from "@/components/ProjectCardFrame";
 import { formatCurrency, formatDate } from "@/lib/calculations";
 import type { Project, ProjectStatus } from "@/lib/types";
 
@@ -47,7 +47,9 @@ export function ProjectCard({ project, budgetTotal = 0, unreadCount = 0 }: Proje
   const statusStyle = STATUS_STYLES[project.status];
 
   return (
-    <article className={`rounded-lg border p-4 shadow-soft transition hover:-translate-y-0.5 hover:border-moss ${statusStyle.border} ${statusStyle.wash}`}>
+    <ProjectCardFrame projectId={project.id} projectName={project.name}
+      initialHighlighted={Boolean(project.is_highlighted)} unreadCount={unreadCount}
+      statusClasses={`${statusStyle.border} ${statusStyle.wash}`}>
       <Link href={`/projects/${project.id}`} prefetch={false} className="block">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -79,13 +81,6 @@ export function ProjectCard({ project, budgetTotal = 0, unreadCount = 0 }: Proje
           </span>
         </div>
       </Link>
-      <ProjectCardActions projectId={project.id} projectName={project.name}>
-        {unreadCount > 0 ? (
-          <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-red-600 px-2 text-sm font-black text-white shadow-soft">
-            {unreadCount > 99 ? "99+" : unreadCount}
-          </span>
-        ) : null}
-      </ProjectCardActions>
-    </article>
+    </ProjectCardFrame>
   );
 }

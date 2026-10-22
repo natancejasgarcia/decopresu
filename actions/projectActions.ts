@@ -19,6 +19,25 @@ const projectSchema = z.object({
   internal_notes: z.string().trim().optional(),
 });
 
+export async function setProjectHighlightAction(input: {
+  project_id: string;
+  highlighted: boolean;
+}) {
+  const parsed = z.object({ project_id: z.string().uuid(), highlighted: z.boolean() }).safeParse(input);
+  if (!parsed.success) return { error: "No se pudo identificar el proyecto." };
+
+  const { supabase } = await requireUserProfile();
+  const { data, error } = await supabase.from("projects")
+    .update({ is_highlighted: parsed.data.highlighted })
+    .eq("id", parsed.data.project_id)
+    .select("id, is_highlighted")
+    .single();
+
+  if (error || !data) return { error: "No se pudo guardar la marca. Vuelve a intentarlo." };
+  revalidatePath("/projects");
+  return { highlighted: Boolean(data.is_highlighted) };
+}
+
 export async function createProjectAction(formData: FormData) {
   const { supabase, user } = await requireUserProfile();
   const parsed = projectSchema.safeParse(Object.fromEntries(formData));
