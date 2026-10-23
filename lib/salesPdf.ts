@@ -178,6 +178,19 @@ export async function generateSalesPdf(
       muted,
     );
   y -= 16;
+  const invoiceColumns = document.kind === "invoice";
+  const quantityRight = 338;
+  const priceRight = 469;
+  const baseRight = width - margin - 8;
+  const unitX = 350;
+  const unitWidth = 54;
+  const unitSize = 8;
+  function tableAmount(value: string, rightEdge: number, maxWidth: number, isBold = false) {
+    const font = isBold ? bold : regular;
+    const printable = safe(value);
+    const size = Math.min(10, maxWidth / font.widthOfTextAtSize(printable, 1));
+    text(printable, rightEdge - font.widthOfTextAtSize(printable, size), y, size, isBold);
+  }
   function tableHeading() {
     ensure(40);
     page.drawRectangle({
@@ -188,9 +201,10 @@ export async function generateSalesPdf(
       color: green,
     });
     text("CONCEPTO", margin + 8, y - 14, 9, true, rgb(1, 1, 1));
-    text("CANT.", 334, y - 14, 9, true, rgb(1, 1, 1));
-    text("PRECIO", 397, y - 14, 9, true, rgb(1, 1, 1));
-    text("BASE", 493, y - 14, 9, true, rgb(1, 1, 1));
+    text("CANT.", invoiceColumns ? 298 : 334, y - 14, 9, true, rgb(1, 1, 1));
+    if (invoiceColumns) text("UNIDAD", unitX, y - 14, 9, true, rgb(1, 1, 1));
+    text("PRECIO", invoiceColumns ? 418 : 397, y - 14, 9, true, rgb(1, 1, 1));
+    text("BASE", invoiceColumns ? 518 : 493, y - 14, 9, true, rgb(1, 1, 1));
     y -= 42;
   }
   tableHeading();
@@ -199,31 +213,39 @@ export async function generateSalesPdf(
       nextPage();
       tableHeading();
     }
-    const conceptRows = wrapped(line.concept, 273, 11, true);
+    const conceptRows = wrapped(line.concept, invoiceColumns ? 228 : 273, 11, true);
+    const unitRows = invoiceColumns ? wrapped(line.unit || "-", unitWidth, unitSize) : [];
     const amount = (value: number) =>
       new Intl.NumberFormat("es-ES", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }).format(value);
-    text(amount(line.quantity), 334, y, 10);
-    text(amount(line.unit_price), 397, y, 10);
+    if (invoiceColumns) {
+      tableAmount(amount(line.quantity), quantityRight, 54);
+      tableAmount(amount(line.unit_price), priceRight, 63);
+    } else {
+      text(amount(line.quantity), 334, y, 10);
+      text(amount(line.unit_price), 397, y, 10);
+    }
     const total = amount(roundAmount(line.quantity * line.unit_price));
-    text(
+    if (invoiceColumns) tableAmount(total, baseRight, 68, true);
+    else text(
       total,
       width - margin - bold.widthOfTextAtSize(total, 10) - 8,
       y,
       10,
       true,
     );
-    for (const row of conceptRows) {
+    for (let row = 0; row < Math.max(conceptRows.length, unitRows.length); row++) {
       if (y < 70) {
         nextPage();
         tableHeading();
       }
-      text(row, margin + 8, y, 11, true);
+      if (conceptRows[row]) text(conceptRows[row], margin + 8, y, 11, true);
+      if (unitRows[row]) text(unitRows[row], unitX, y, unitSize, false, muted);
       y -= 15;
     }
-    if (line.unit) {
+    if (!invoiceColumns && line.unit) {
       text(
         `Unidad: ${line.unit} · IVA ${line.vat_rate}%`,
         margin + 8,
@@ -233,7 +255,7 @@ export async function generateSalesPdf(
         muted,
       );
       y -= 15;
-    } else {
+    } else if (!invoiceColumns) {
       text(`IVA ${line.vat_rate}%`, margin + 8, y, 9, false, muted);
       y -= 15;
     }
