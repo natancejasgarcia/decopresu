@@ -52,6 +52,10 @@ export type SalesPayment = {
   amount: number;
   payment_date: string;
   method: string;
+  receipt_file_name?: string | null;
+  receipt_file_url?: string | null;
+  receipt_file_type?: string | null;
+  receipt_signed_url?: string;
 };
 export const DEFAULT_COMPANY: CompanySettings = {
   id: 1,

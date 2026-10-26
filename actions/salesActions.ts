@@ -13,9 +13,11 @@ import {
   type CompanySettings,
 } from "@/lib/sales";
 import { PAYMENT_METHODS } from "@/lib/types";
+import { uploadedSalesPaymentReceiptSchema, validSalesPaymentReceiptPath } from "@/lib/salesPaymentReceipts";
+import type { SalesPayment } from "@/lib/sales";
 
 type Result =
-  { ok: true; id?: string; number?: string } | { ok: false; error: string };
+  { ok: true; id?: string; number?: string; receipt?: Pick<SalesPayment, "receipt_file_name" | "receipt_file_url" | "receipt_file_type" | "receipt_signed_url"> } | { ok: false; error: string };
 function failure(error: { message: string; code?: string }): Extract<Result, { ok: false }> {
   console.error("[Decoralia sales]", error.code, error.message);
   if (salesUnavailable(error) || error.code === "PGRST202")
@@ -115,10 +117,11 @@ export async function recordSalesPaymentAction(
   id: string,
   formData: FormData,
 ): Promise<Result> {
-  const { supabase } = await requireUserProfile();
+  const { supabase, user } = await requireUserProfile();
   const parsed = z
     .object({
       id: z.string().uuid(),
+      payment_id: z.string().uuid(),
       amount: z.preprocess(
         (v) => Number(String(v).replace(",", ".")),
         z.number().finite().positive().max(99999999),
@@ -128,6 +131,7 @@ export async function recordSalesPaymentAction(
     })
     .safeParse({
       id,
+      payment_id: formData.get("payment_id") ?? crypto.randomUUID(),
       amount: formData.get("amount"),
       date: formData.get("date"),
       method: formData.get("method"),
@@ -137,15 +141,46 @@ export async function recordSalesPaymentAction(
       ok: false,
       error: "Revisa el importe, la fecha y la forma de pago.",
     };
-  const { data, error } = await supabase.rpc("record_sales_payment", {
+  let receipt = null;
+  try {
+    const raw = formData.get("uploaded_receipt");
+    if (raw) {
+      const metadata = uploadedSalesPaymentReceiptSchema.safeParse(JSON.parse(String(raw)));
+      if (!metadata.success || !validSalesPaymentReceiptPath(metadata.data.path, id, user.id, parsed.data.payment_id))
+        return { ok: false, error: "El justificante no pertenece a este cobro. Vuelve a seleccionarlo." };
+      const stored = await supabase.storage.from("project-files").info(metadata.data.path);
+      const size = Number(stored.data?.size ?? stored.data?.metadata?.size);
+      const type = stored.data?.contentType ?? stored.data?.metadata?.mimetype;
+      if (stored.error || !stored.data || size !== metadata.data.size || type !== metadata.data.type)
+        return { ok: false, error: "No se pudo comprobar el justificante. El cobro no se ha registrado." };
+      receipt = metadata.data;
+    }
+    const file = formData.get("receipt");
+    if (file instanceof File && file.size > 0)
+      return { ok: false, error: "Vuelve a seleccionar el adjunto desde el formulario para subirlo." };
+  } catch {
+    return { ok: false, error: "No se pudo comprobar el adjunto. El cobro no se ha registrado; vuelve a intentarlo." };
+  }
+  const { data, error } = await supabase.rpc("record_sales_payment_with_receipt", {
     p_id: id,
+    p_payment_id: parsed.data.payment_id,
     p_amount: parsed.data.amount,
     p_date: parsed.data.date,
     p_method: parsed.data.method,
+    p_receipt: receipt,
   });
   if (error) return failure(error);
   refresh(id);
-  return { ok: true, id: String(data) };
+  if (!receipt) return { ok: true, id: String(data) };
+  let signedUrl: string | undefined;
+  try {
+    const signed = await supabase.storage.from("project-files").createSignedUrl(receipt.path, 3600);
+    signedUrl = signed.data?.signedUrl;
+  } catch { /* The payment is already committed; a refresh can renew the private link. */ }
+  return { ok: true, id: String(data), receipt: {
+    receipt_file_name: receipt.name, receipt_file_url: receipt.path,
+    receipt_file_type: receipt.type, receipt_signed_url: signedUrl,
+  } };
 }
 export async function saveCompanyAction(
   input: unknown,

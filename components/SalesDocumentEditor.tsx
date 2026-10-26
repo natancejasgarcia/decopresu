@@ -40,6 +40,7 @@ import { formatCurrency } from "@/lib/calculations";
 import { SalesPartialInvoiceForm } from "@/components/SalesPartialInvoiceForm";
 import { SalesPaymentForm } from "@/components/SalesPaymentForm";
 import { CompanySettingsForm } from "@/components/CompanySettingsForm";
+import { prepareSalesPaymentSubmission, type SalesPaymentReceiptCache } from "@/lib/uploadSalesPaymentReceipt";
 
 function inputFrom(doc: SalesDocument): SalesDraftInput {
   return {
@@ -113,6 +114,8 @@ export function SalesDocumentEditor({
   const cancelRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const collectionPromptSeen = useRef(false);
+  const paymentRequestId = useRef<string>();
+  const paymentReceiptCache = useRef<SalesPaymentReceiptCache>(null);
   const readonly = document.status === "issued";
   const title = SALES_LABELS[document.kind];
   const totals = salesTotals(input.lines);
@@ -256,6 +259,15 @@ export function SalesDocumentEditor({
   function savePayment(values: FormData) {
     if (paymentUncertain) return;
     run(async () => {
+      try {
+        paymentRequestId.current ??= crypto.randomUUID();
+        const prepared = await prepareSalesPaymentSubmission(values, document.id, paymentRequestId.current, paymentReceiptCache.current);
+        values = prepared.formData;
+        paymentReceiptCache.current = prepared.cached;
+      } catch (error) {
+        setFeedback({ error: true, text: error instanceof Error ? error.message : "No se pudo subir el justificante. El cobro no se ha registrado." });
+        return;
+      }
       let result;
       try {
         result = await recordSalesPaymentAction(document.id, values);
@@ -281,8 +293,11 @@ export function SalesDocumentEditor({
             amount: Number(String(values.get("amount")).replace(",", ".")),
             payment_date: String(values.get("date")),
             method: String(values.get("method")),
+            ...result.receipt,
           },
         ]);
+      paymentRequestId.current = undefined;
+      paymentReceiptCache.current = null;
       closeCollection();
       setFeedback({
         error: false,
@@ -832,6 +847,13 @@ export function SalesDocumentEditor({
                 >
                   <span>
                     {displayDay(p.payment_date)} · {p.method}
+                    {p.receipt_signed_url ? (
+                      <a href={p.receipt_signed_url} target="_blank" rel="noreferrer"
+                        className="mt-1 flex min-h-11 items-center gap-2 break-all text-sm font-bold text-moss underline">
+                        <FileText size={16} className="shrink-0" aria-hidden="true" />
+                        Ver justificante{p.receipt_file_name ? `: ${p.receipt_file_name}` : ""}
+                      </a>
+                    ) : p.receipt_file_name ? <span className="mt-1 block break-all text-sm text-muted">{p.receipt_file_name}</span> : null}
                   </span>
                   <strong>{formatCurrency(Number(p.amount))}</strong>
                 </li>

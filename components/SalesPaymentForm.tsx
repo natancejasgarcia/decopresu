@@ -60,6 +60,16 @@ export function SalesPaymentForm({
           ))}
         </select>
       </label>
+      <label className="min-w-0 sm:col-span-2">
+        <span className="form-label">Justificante del cobro (imagen o PDF, hasta 10 MB, opcional)</span>
+        <input
+          className="form-input w-full min-w-0 file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:font-bold file:text-white"
+          name="receipt"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif,image/heic,application/pdf,.jpg,.jpeg,.png,.webp,.gif,.heic,.pdf"
+          disabled={pending}
+        />
+      </label>
       <div className="flex flex-wrap gap-3 sm:col-span-2">
         <button className="action-primary" type="submit" disabled={pending}>
           <Save size={20} />

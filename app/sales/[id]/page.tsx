@@ -3,6 +3,7 @@ import { z } from "zod";
 import { TopBar } from "@/components/TopBar";
 import { SalesDocumentEditor } from "@/components/SalesDocumentEditor";
 import { requireUserProfile } from "@/lib/auth";
+import { signProjectFileUrls } from "@/lib/signedProjectFiles";
 import {
   DEFAULT_COMPANY,
   type CompanySettings,
@@ -33,7 +34,7 @@ export default async function SalesDocumentPage({
       .maybeSingle<SalesDocument>(),
     supabase
       .from("project_payments")
-      .select("id,sales_document_id,amount,payment_date,method")
+      .select("id,sales_document_id,amount,payment_date,method,receipt_file_name,receipt_file_url,receipt_file_type")
       .eq("sales_document_id", params.id)
       .order("payment_date")
       .returns<SalesPayment[]>(),
@@ -52,6 +53,10 @@ export default async function SalesDocumentPage({
   if (error || paymentError || invoiceError || companyError)
     throw new Error("No se pudo cargar el documento.");
   if (!document) notFound();
+  const receiptUrls = await signProjectFileUrls(supabase, (payments ?? []).map(payment => payment.receipt_file_url));
+  const paymentsWithReceipts = (payments ?? []).map(payment => ({ ...payment,
+    receipt_signed_url: payment.receipt_file_url ? receiptUrls.get(payment.receipt_file_url) : undefined,
+  }));
   return (
     <main className="min-h-screen pb-8">
       <TopBar profile={profile} />
@@ -59,7 +64,7 @@ export default async function SalesDocumentPage({
         <SalesDocumentEditor
           key={document.id}
           document={document}
-          payments={payments ?? []}
+          payments={paymentsWithReceipts}
           linkedInvoiceId={invoice?.id}
           initialPartial={searchParams.partial === "1"}
           initialCollect={searchParams.collect === "1"}

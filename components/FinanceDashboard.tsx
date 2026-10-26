@@ -304,6 +304,7 @@ export function FinanceDashboard({ projects, budgetItems, expenses, payments, fi
                   hiddenInputs={{ payment_id: payment.id, project_id: payment.project_id ?? "" }}
                   receiptName={payment.receipt_file_name}
                   receiptUrl={payment.receipt_signed_url}
+                  invoiceId={payment.sales_document_id}
                 />
               ))}
             </MonthlyFinanceList>
@@ -533,6 +534,7 @@ function FinanceRow({
   hiddenInputs,
   receiptName,
   receiptUrl,
+  invoiceId,
 }: {
   title: string;
   meta: string;
@@ -541,14 +543,16 @@ function FinanceRow({
   hiddenInputs: Record<string, string>;
   receiptName?: string | null;
   receiptUrl?: string;
+  invoiceId?: string | null;
 }) {
   return (
-    <article className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-line p-3">
-      <div>
+    <article className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg border border-line p-3">
+      <div className="min-w-0 break-words">
         <strong className="block text-sm text-ink">{title}</strong>
         <p className="text-xs font-semibold text-muted">{meta}</p>
+        {invoiceId ? <Link href={`/sales/${invoiceId}`} prefetch={false} className="mt-1 flex min-h-11 items-center text-xs font-bold text-moss underline">Ver factura vinculada</Link> : null}
         {receiptUrl ? (
-          <a className="mt-1 inline-flex text-xs font-black text-moss underline" href={receiptUrl} target="_blank" rel="noreferrer">
+          <a className="mt-1 inline-flex max-w-full break-all text-xs font-black text-moss underline" href={receiptUrl} target="_blank" rel="noreferrer">
             Ver adjunto {receiptName ? `- ${receiptName}` : ""}
           </a>
         ) : null}

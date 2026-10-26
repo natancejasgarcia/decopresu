@@ -218,6 +218,7 @@ export type ProjectExpense = {
 
 export type ProjectPayment = {
   id: string;
+  sales_document_id?: string | null;
   project_id: string | null;
   amount: number;
   payment_date: string;

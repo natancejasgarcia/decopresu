@@ -141,17 +141,20 @@ test("issuance creates no receipt until the user explicitly registers it", async
   values.set("amount", "477,50");
   values.set("date", "2026-11-03");
   values.set("method", "Transferencia");
+  values.set("payment_id", "00000000-0000-4000-8000-000000000002");
   assert.deepEqual(await actions.recordSalesPaymentAction(doc.id, values), {
     ok: true,
     id: "payment-id",
   });
   assert.deepEqual(calls[1], {
-    name: "record_sales_payment",
+    name: "record_sales_payment_with_receipt",
     values: {
       p_id: doc.id,
       p_amount: 477.5,
       p_date: "2026-11-03",
       p_method: "Transferencia",
+      p_payment_id: "00000000-0000-4000-8000-000000000002",
+      p_receipt: null,
     },
   });
   assert.ok(refreshes.includes("/finance"));
