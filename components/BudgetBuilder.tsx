@@ -2,6 +2,8 @@
 
 import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useAsyncTask } from "@/lib/useAsyncTask";
+import { saveProjectVatAction } from "@/actions/projectVatActions";
 import { Calculator, ChevronDown, ChevronUp, Download, GripVertical, Pencil, ReceiptText, Save, Sparkles, Trash2, X } from "lucide-react";
 import {
   createBudgetItemAction,
@@ -20,6 +22,7 @@ import type { BudgetItem, Room } from "@/lib/types";
 
 type BudgetBuilderProps = {
   projectId: string;
+  initialVatRate?: BudgetVatRate;
   items: BudgetItem[];
   rooms: Room[];
   conceptSuggestions?: BudgetConceptSuggestion[];
@@ -35,7 +38,7 @@ function getRoomModulesArea(room: Room) {
     .reduce((sum, module) => sum + Number(module.quantity), 0);
 }
 
-export function BudgetBuilder({ projectId, items, rooms, conceptSuggestions = [] }: BudgetBuilderProps) {
+export function BudgetBuilder({ projectId, initialVatRate = DEFAULT_BUDGET_VAT, items, rooms, conceptSuggestions = [] }: BudgetBuilderProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isFixedPrice, setIsFixedPrice] = useState(false);
@@ -45,7 +48,9 @@ export function BudgetBuilder({ projectId, items, rooms, conceptSuggestions = []
   const [editIsFixedPrice, setEditIsFixedPrice] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
-  const [vatRate, setVatRate] = useState<BudgetVatRate>(DEFAULT_BUDGET_VAT);
+  const [vatRate, setVatRate] = useState<BudgetVatRate>(initialVatRate);
+  const [vatPending, saveVat] = useAsyncTask();
+  const [vatFeedback, setVatFeedback] = useState<{ error: boolean; text: string } | null>(null);
   const [newConceptKey, setNewConceptKey] = useState(0);
   const conceptCatalog = useMemo(() => buildBudgetConceptCatalog([
     ...[...orderedItems].reverse().map((item) => ({ concept: item.concept, notes: item.notes ?? "" })),
@@ -67,8 +72,27 @@ export function BudgetBuilder({ projectId, items, rooms, conceptSuggestions = []
   }, [items]);
 
   useEffect(() => {
-    setVatRate(DEFAULT_BUDGET_VAT);
-  }, [projectId]);
+    setVatRate(initialVatRate);
+    setVatFeedback(null);
+  }, [projectId, initialVatRate]);
+
+  function changeVat(rate: BudgetVatRate) {
+    void saveVat(async () => {
+      setVatFeedback(null);
+      try {
+        const result = await saveProjectVatAction(projectId, rate);
+        if (!result.ok) {
+          setVatFeedback({ error: true, text: result.error });
+          return;
+        }
+        setVatRate(result.vatRate);
+        setVatFeedback({ error: false, text: "IVA guardado" });
+        router.refresh();
+      } catch {
+        setVatFeedback({ error: true, text: "No se pudo confirmar el IVA. Recarga la obra para comprobarlo." });
+      }
+    });
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -123,7 +147,7 @@ export function BudgetBuilder({ projectId, items, rooms, conceptSuggestions = []
     setIsDownloadingPdf(true);
 
     try {
-      const response = await fetch(`/projects/${projectId}/budget/pdf?vat_rate=${vatRate}`, {
+      const response = await fetch(`/projects/${projectId}/budget/pdf`, {
         credentials: "same-origin",
       });
 
@@ -226,15 +250,16 @@ export function BudgetBuilder({ projectId, items, rooms, conceptSuggestions = []
           <p className="mt-1 text-sm text-muted">Crea conceptos manuales o deja que la IA rellene cards editables desde los archivos de la obra.</p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
-          <fieldset disabled={isDownloadingPdf}>
-            <legend className="mb-1 text-sm font-bold">IVA del PDF</legend>
+          <fieldset disabled={isDownloadingPdf || vatPending}>
+            <legend className="mb-1 text-sm font-bold">IVA de la obra</legend>
             <div className="flex gap-2">
               {([10, 21] as const).map((rate) => <label key={rate} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 font-bold ${vatRate === rate ? "border-moss bg-emerald-50 text-moss" : "border-line bg-white text-ink"}`}>
-                <input className="accent-moss" type="radio" name={`budget-vat-${projectId}`} value={rate} checked={vatRate === rate} onChange={() => setVatRate(rate)} />
+                <input className="accent-moss" type="radio" name={`budget-vat-${projectId}`} value={rate} checked={vatRate === rate} onChange={() => changeVat(rate)} />
                 {rate} %
               </label>)}
             </div>
           </fieldset>
+          {vatPending ? <span role="status" className="text-sm text-muted">Guardando IVA...</span> : vatFeedback ? <span role={vatFeedback.error ? "alert" : "status"} className={`max-w-64 text-sm ${vatFeedback.error ? "text-red-700" : "text-moss"}`}>{vatFeedback.text}</span> : null}
           <button
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-ink px-3 text-sm font-black text-white disabled:opacity-60"
             disabled={isPending}
@@ -246,7 +271,7 @@ export function BudgetBuilder({ projectId, items, rooms, conceptSuggestions = []
           </button>
           <button
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line px-3 text-sm font-black text-ink disabled:opacity-60"
-            disabled={isDownloadingPdf}
+            disabled={isDownloadingPdf || vatPending}
             onClick={handlePdfDownload}
             type="button"
           >

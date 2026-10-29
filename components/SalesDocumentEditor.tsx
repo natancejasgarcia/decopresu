@@ -30,6 +30,7 @@ import {
   roundAmount,
   SALES_LABELS,
   salesTotals,
+  salesDefaultVat,
   type SalesDocument,
   type SalesDraftInput,
   type SalesLine,
@@ -119,6 +120,7 @@ export function SalesDocumentEditor({
   const readonly = document.status === "issued";
   const title = SALES_LABELS[document.kind];
   const totals = salesTotals(input.lines);
+  const defaultVat = salesDefaultVat(input.lines, document.default_vat_rate ?? 21);
   const allPayments = [
     ...payments,
     ...savedPayments.filter(
@@ -518,6 +520,7 @@ export function SalesDocumentEditor({
             {partialOpen && (
               <SalesPartialInvoiceForm
                 sourceLabel={document.source_label}
+                initialVatRate={defaultVat}
                 disabled={pending}
                 onCancel={() => setPartialOpen(false)}
                 onApply={(lines) => {
@@ -586,7 +589,7 @@ export function SalesDocumentEditor({
                       quantity: 1,
                       unit: "",
                       unit_price: 0,
-                      vat_rate: 21,
+                      vat_rate: defaultVat,
                     },
                   ])
                 }

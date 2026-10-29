@@ -42,7 +42,7 @@ export async function GET(
       );
     const { bytes, filename } = await buildBudgetPdf({
       ...budget,
-      vatRate: selectedVat.data,
+      vatRate: request.nextUrl?.searchParams.has("vat_rate") ? selectedVat.data : budget.project.budget_vat_rate,
     });
     return new NextResponse(bytes, {
       headers: {

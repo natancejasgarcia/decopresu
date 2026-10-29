@@ -66,6 +66,7 @@ test("only 10 and 21 percent are accepted; old download links keep 21 percent", 
 test("budget UI exposes both VAT choices beside download and a VAT-inclusive total", () => {
   const { BudgetBuilder } = load("components/BudgetBuilder.tsx", {
     "@/actions/budgetActions": {},
+    "@/actions/projectVatActions": {},
     "next/navigation": { useRouter: () => ({ refresh() {} }) },
   });
   const html = renderToStaticMarkup(
@@ -75,7 +76,7 @@ test("budget UI exposes both VAT choices beside download and a VAT-inclusive tot
       rooms: [],
     }),
   );
-  assert.match(html, /IVA del PDF/);
+  assert.match(html, /IVA de la obra/);
   assert.match(html, /type="radio"[^>]*value="10"/);
   assert.match(html, /type="radio"[^>]*checked=""[^>]*value="21"/);
   assert.match(html, /Descargar PDF/);

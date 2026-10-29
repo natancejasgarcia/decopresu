@@ -44,6 +44,7 @@ export type Project = {
   status: ProjectStatus;
   project_type: ProjectType;
   is_highlighted?: boolean;
+  budget_vat_rate?: import("./budgetVat").BudgetVatRate;
   internal_notes: string | null;
   created_by: string | null;
   created_at: string;

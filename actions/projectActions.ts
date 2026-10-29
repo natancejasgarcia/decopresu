@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUserProfile } from "@/lib/auth";
 import { PROJECT_STATUSES, PROJECT_TYPES } from "@/lib/types";
+import { budgetVatSchema } from "@/lib/budgetVat";
 import type { BudgetItem, Project, Room, RoomModule } from "@/lib/types";
 
 const projectSchema = z.object({
@@ -152,6 +153,7 @@ export async function cloneProjectAction(formData: FormData) {
       description: project.description,
       status: "Pendiente",
       project_type: project.project_type ?? "Pintura",
+      budget_vat_rate: budgetVatSchema.parse(project.budget_vat_rate),
       internal_notes: project.internal_notes,
       created_by: user.id,
     })

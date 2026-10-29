@@ -28,6 +28,7 @@ export type SalesDocument = {
   project_id: string | null;
   source_document_id: string | null;
   source_label: string;
+  default_vat_rate?: SalesLine["vat_rate"] | null;
   client_name: string;
   client_tax_id: string;
   client_address: string;
@@ -57,6 +58,11 @@ export type SalesPayment = {
   receipt_file_type?: string | null;
   receipt_signed_url?: string;
 };
+
+export function salesDefaultVat(lines: SalesLine[], fallback: SalesLine["vat_rate"] = 21): SalesLine["vat_rate"] {
+  const first = lines[0]?.vat_rate;
+  return first !== undefined && lines.every((line) => line.vat_rate === first) ? first : fallback;
+}
 export const DEFAULT_COMPANY: CompanySettings = {
   id: 1,
   legal_name: "DECORALIA ACABADOS, S.L.",

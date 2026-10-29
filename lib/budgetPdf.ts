@@ -127,7 +127,7 @@ function drawTableHeader(page: PDFPage, y: number, headers: Array<{ label: strin
   return y - 18;
 }
 
-export async function buildBudgetPdf({ project, items: itemsData, rooms: roomsData, vatRate = DEFAULT_BUDGET_VAT }: {
+export async function buildBudgetPdf({ project, items: itemsData, rooms: roomsData, vatRate }: {
   project: Project;
   items: BudgetItem[];
   rooms: Room[];
@@ -135,7 +135,7 @@ export async function buildBudgetPdf({ project, items: itemsData, rooms: roomsDa
 }) {
   const items = sortBudgetItems(itemsData ?? []);
   const rooms = roomsData ?? [];
-  const selectedVat = budgetVatSchema.parse(vatRate);
+  const selectedVat = budgetVatSchema.parse(vatRate ?? project.budget_vat_rate ?? DEFAULT_BUDGET_VAT);
   const { taxableBase, vat, total } = budgetVatTotals(items.reduce((sum, item) => sum + Number(item.total), 0), selectedVat);
   const issuedAt = new Date();
   const expiresAt = addDays(issuedAt, 14);

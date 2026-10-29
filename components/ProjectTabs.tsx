@@ -268,6 +268,7 @@ export function ProjectTabs({
         {activeTab === "Presupuesto" ? (
           <BudgetBuilder
             projectId={project.id}
+            initialVatRate={project.budget_vat_rate}
             items={budgetItems}
             conceptSuggestions={budgetConceptSuggestions}
             rooms={rooms}

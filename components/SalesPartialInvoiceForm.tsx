@@ -13,11 +13,13 @@ import {
 export function SalesPartialInvoiceForm({
   sourceLabel,
   disabled,
+  initialVatRate = 21,
   onApply,
   onCancel,
 }: {
   sourceLabel: string;
   disabled: boolean;
+  initialVatRate?: SalesLine["vat_rate"];
   onApply: (lines: SalesLine[]) => void;
   onCancel: () => void;
 }) {
@@ -25,7 +27,7 @@ export function SalesPartialInvoiceForm({
   const [concept, setConcept] = useState(() =>
     `Factura parcial${sourceLabel ? ` - ${sourceLabel}` : ""}`.slice(0, 200),
   );
-  const [vat, setVat] = useState<SalesLine["vat_rate"]>(21);
+  const [vat, setVat] = useState<SalesLine["vat_rate"]>(initialVatRate);
   const [error, setError] = useState("");
   const parsed = partialInvoiceSchema.safeParse({
     amount,
